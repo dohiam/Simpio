@@ -1,0 +1,34 @@
+;!
+;  @file /test_set.pio
+;  @brief Tests the PIO SET instruction
+;  @details
+;  Tests the various destinations and the side set feature.
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+
+; pio 0, sm 0, input gpio 1, output gpio 5
+.config pio 0
+.config sm 0
+.config set_pins 1 5
+.config side_set_pins 10 3 1 0 ; base=10, num_pins=3, optional=1, pindirs=0
+
+    SET PINS, 31
+    SET X, 31
+    SET Y, 31
+    
+    SET PINS, 0
+    SET X, 0
+    SET Y, 0
+    
+    SET PINS, 21
+    SET X, 21
+    SET Y, 21
+    
+    SET PINS, 31 SIDE 3
+    SET PINS, 0  SIDE 0
+    SET PINS, 31 SIDE 3
+   
+DONE:
+    JMP DONE
+    

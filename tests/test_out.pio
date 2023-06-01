@@ -1,0 +1,83 @@
+;!
+;  @file /test_out.pio
+;  @brief Basic test of PIO OUT instruction
+;  @details
+;  Outputting is pulling a value from the TX FIFO and most often shifting it out to GPIO pins, perhaps 
+;  along with clock pulses on other GPIO pins to "output" the value. However, PIO also provides other 
+;  destination possibilities.It also provides a way to automatically pull the next value from the 
+;  TX FIFO when the current value has been completely shifted out. 
+;
+;  Although how values get into the TX FIFO is beyond the scope of PIO, it is typically done by an 
+;  external program, so it is helpful to think of the PIO program as a device-driver and the external
+;  program as a user program, with the TX FIFO as the interface between user programs and the 
+;  device driver which interfaces with real hardware to transmit the value.
+;
+;  Because this simulator doesn't provide a way to simulate user programs, a meta-instruction is 
+;  provided to load a value into the TX FIFO. The format of this instruction is simply 
+;  "WRITE <number>" which causes the TX FIFO to be loaded with that value. 
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+
+.config pio 0
+.config sm 0
+.config user_processor 0
+.config out_pins 1 2
+.config shiftctl_out_shiftdir 1        ; shift from msb to lsb
+.config side_set_pins 20 1 1 0 ; base=20, num_pins=1, optional=1, pindirs=0 
+.config execctrl_status_sel 0 1 ; 1=rx, 0=tx, status all ones if level of chosen FIFO is < specified number, else all zeros
+
+; first write to pins with and without side set and delay
+
+    WRITE 9                  ; TX FIFO <- 1 0 0 1
+    PULL
+    OUT PINS, 2              ; GPIOs 1,2 <- 1,0 
+    OUT PINS, 2              ; GPIOs 1,2 <- 0,1  
+    
+    WRITE 9                  ; TX FIFO <- 1 0 0 1
+    PULL
+    OUT PINS, 2  [3]         ; GPIOs 1,2 <- 1,0 
+    OUT PINS, 2  [3]         ; GPIOs 1,2 <- 0,1  
+
+    WRITE 9                  ; TX FIFO <- 1 0 0 1
+    PULL
+    OUT PINS, 2  SIDE 1      ; GPIOs 1,2 <- 1,0 & simultaneously, GPIO 20 goes high
+    OUT PINS, 2  SIDE 0      ; GPIOs 1,2 <- 0,1 & simultaneously, GPIO 20 goes low
+    
+    
+    WRITE 9                  ; TX FIFO <- 1 0 0 1
+    PULL
+    OUT PINS, 2  SIDE 1  [4] ; GPIOs 1,2 <- 1,0 & this instruction will take 4+1=5 ticks to complete
+    OUT PINS, 2  SIDE 0  [4] ; GPIOs 1,2 <- 0,1 & this instruction will take 4+1=5 ticks to complete
+    
+; now write to other destinations
+
+    WRITE 9
+    PULL
+    OUT   X, 32
+    WRITE 9
+    PULL
+    OUT   Y, 4
+    WRITE 9
+    PULL
+    OUT   NULL, 0
+    WRITE 9
+    PULL
+    OUT   PINDIRS, 2
+    WRITE 23           ; Needs to match address of instruction on line 73, when shifted according to the shift direction
+    PULL
+    OUT   PC, 32
+    JMP   ERROR
+    WRITE 9
+    PULL               ; this is the instruction that PC needs to point to, should not fall through to error
+    OUT   ISR, 4
+    WRITE 29           ; 28 is an unconditional jump to to instruction address 28 (unconditional jump instruction format is trivial)
+    PULL
+    OUT   EXEC, 16
+    
+ERROR:
+   JMP ERROR
+   
+DONE:
+   JMP DONE
+   

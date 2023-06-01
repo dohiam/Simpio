@@ -1,0 +1,34 @@
+;!
+;  @file /test_pull.pio
+;  @brief Basic test of PIO PULL instruction
+;  @details
+;  Test of pull variations, including plain/block, noblock, and ifempty.
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+
+.config pio 0
+.config sm 0
+.config out_pins 1 2
+.config shiftctl_out_shiftdir 1        ; shift from msb to lsb
+.config side_set_pins 20 1 1 0 ; base=20, num_pins=1, optional=1, pindirs=0 
+.config execctrl_status_sel 0 1 ; 1=rx, 0=tx, status all ones if level of chosen FIFO is < specified number, else all zeros
+.config shiftctl_pull_thresh 4
+.config user_processor 0
+
+    WRITE 9 [1]              ; delay, so next pull can block, TX FIFO <- 1 0 0 1
+    PULL                     ; block one time until write runs
+    
+    SET X, 6
+    PULL NOBLOCK             ; will copy scratch X
+    
+    WRITE 9 [3]              ; delay, so above nonblocking pull will be in empty fifo
+    PULL ifempty noblock     ; do nothing
+    OUT PINS, 2              ; GPIOs 1,2 <- 0,1 
+    PULL ifempty noblock     ; do nothing
+    OUT PINS, 2              ; GPIOs 1,2 <- 1,0  
+    PULL ifempty noblock     ; now pulls
+    
+    
+DONE:
+   JMP DONE

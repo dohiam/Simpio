@@ -1,0 +1,2489 @@
+Terminals unused in grammar
+
+    _PUBLIC
+    _OPT
+    _TX_LEVEL
+    _RX_LEVEL
+
+
+Grammar
+
+    0 $accept: statement_list $end
+
+    1 statement_list: statement _EOL
+    2               | statement_list statement _EOL
+
+    3 statement: %empty
+    4          | label
+    5          | directive
+    6          | instruction_side
+    7          | user_instruction_continue
+
+    8 label: _SYMBOL _COLON
+
+    9 directive: define_directive
+   10          | program_directive
+   11          | origen_directive
+   12          | wrap_target_directive
+   13          | wrap_directive
+   14          | lang_opt_directive
+   15          | word_directive
+   16          | config_directive
+
+   17 config_directive: _CONFIG config_statement
+
+   18 config_statement: _PIO number
+   19                 | _SM number
+   20                 | _PIN_CONDITION number
+   21                 | _SET_PINS number number
+   22                 | _IN_PINS number number
+   23                 | _OUT_PINS number number
+   24                 | _SIDE_SET_PINS number number number number
+   25                 | _SIDE_SET_COUNT number
+   26                 | _SHIFTCTL_PULL_THRESH number
+   27                 | _SHIFTCTL_PUSH_THRESH number
+   28                 | _SHIFTCTL_OUT_SHIFTDIR number
+   29                 | _SHIFTCTL_IN_SHIFTDIR number
+   30                 | _AUTOPUSH
+   31                 | _AUTOPULL
+   32                 | _EXECCTRL_STATUS_SEL number number
+   33                 | _USER_PROCESSOR number
+   34                 | _RX_FIFO_MERGE number number
+   35                 | _TX_FIFO_MERGE number number
+   36                 | _VAR _SYMBOL
+
+   37 define_directive: _DEFINE _SYMBOL expression
+
+   38 program_directive: _PROGRAM _SYMBOL
+
+   39 origen_directive: _ORIGEN expression
+
+   40 wrap_target_directive: _WRAP_TARGET
+
+   41 wrap_directive: _WRAP
+
+   42 lang_opt_directive: _LANG_OPT _SYMBOL
+
+   43 word_directive: _WORD expression
+
+   44 instruction_side: instruction
+   45                 | instruction _SIDE number
+   46                 | instruction _DELAY
+   47                 | instruction _SIDE number _DELAY
+
+   48 instruction: jmp_instruction
+   49            | nop_instruction
+   50            | wait_instruction
+   51            | in_instruction
+   52            | out_instruction
+   53            | push_instruction
+   54            | pull_instruction
+   55            | mov_instruction
+   56            | irq_instruction
+   57            | set_instruction
+
+   58 user_instruction_continue: user_instruction_delay _CONTINUE_USER
+   59                          | user_instruction_delay
+
+   60 user_instruction_delay: user_instruction _DELAY
+   61                       | user_instruction
+
+   62 user_instruction: write_instruction
+   63                 | read_instruction
+   64                 | pin_instruction
+
+   65 jmp_instruction: _JMP jmp_condition _SYMBOL
+
+   66 jmp_condition: %empty
+   67              | _NOT_X
+   68              | _NOT_Y
+   69              | _X_DECREMENT
+   70              | _Y_DECREMENT
+   71              | _X_NOT_EQUAL_Y
+   72              | _PIN
+   73              | _NOT_OSRE
+
+   74 nop_instruction: _NOP
+
+   75 wait_instruction: _WAIT polarity wait_source
+
+   76 polarity: _BINARY_DIGIT
+
+   77 wait_source: _GPIO index
+   78            | _PIN index
+   79            | _IRQ index relative
+
+   80 index: expression
+
+   81 relative: %empty
+   82         | _RELATIVE
+
+   83 in_instruction: _IN source expression
+
+   84 source: _PINS
+   85       | _X
+   86       | _Y
+   87       | _NULL
+   88       | _ISR
+   89       | _OSR
+   90       | _STATUS
+
+   91 out_instruction: _OUT destination expression
+
+   92 destination: _PINS
+   93            | _X
+   94            | _Y
+   95            | _NULL
+   96            | _PINDIRS
+   97            | _PC
+   98            | _ISR
+   99            | _OSR
+  100            | _EXEC
+
+  101 push_instruction: _PUSH iffull_block
+
+  102 iffull_block: %empty
+  103             | _IFFULL
+  104             | _IFFULL _NOBLOCK
+  105             | _IFFULL _BLOCK
+  106             | _NOBLOCK
+  107             | _BLOCK
+
+  108 pull_instruction: _PULL ifempty_block
+
+  109 ifempty_block: %empty
+  110              | _IFEMPTY
+  111              | _IFEMPTY _NOBLOCK
+  112              | _IFEMPTY _BLOCK
+  113              | _NOBLOCK
+  114              | _BLOCK
+
+  115 mov_instruction: _MOV destination operation source
+
+  116 operation: %empty
+  117          | _BANG
+  118          | _COLON_COLON
+
+  119 irq_instruction: _IRQ irq_operation number relative
+
+  120 irq_operation: %empty
+  121              | _SET
+  122              | _NOWAIT
+  123              | _WAIT
+  124              | _CLEAR
+
+  125 set_instruction: _SET destination expression
+
+  126 write_instruction: _WRITE number
+
+  127 read_instruction: _READ _SYMBOL
+
+  128 pin_instruction: _PIN number _HIGH
+  129                | _PIN number _LOW
+
+  130 expression: expression '+' mulexp
+  131           | expression '-' mulexp
+  132           | mulexp
+
+  133 mulexp: mulexp '*' primary
+  134       | mulexp '/' primary
+  135       | primary
+
+  136 primary: '(' expression ')'
+  137        | '-' primary
+  138        | number
+
+  139 number: _BINARY_DIGIT
+  140       | _BINARY_NUMBER
+  141       | _HEX_NUMBER
+  142       | _DECIMAL_NUMBER
+
+
+Terminals, with rules where they appear
+
+    $end (0) 0
+    '(' (40) 136
+    ')' (41) 136
+    '*' (42) 133
+    '+' (43) 130
+    '-' (45) 131 137
+    '/' (47) 134
+    error (256)
+    _DEFINE (258) 37
+    _PROGRAM (259) 38
+    _ORIGEN (260) 39
+    _WRAP_TARGET (261) 40
+    _WRAP (262) 41
+    _LANG_OPT (263) 42
+    _WORD (264) 43
+    _JMP (265) 65
+    _NOP (266) 74
+    _WAIT (267) 75 123
+    _IN (268) 83
+    _OUT (269) 91
+    _PUSH (270) 101
+    _PULL (271) 108
+    _MOV (272) 115
+    _SET (273) 121 125
+    _PUBLIC (274)
+    _OPT (275)
+    _GPIO (276) 77
+    _IRQ (277) 79 119
+    _NOT_X (278) 67
+    _NOT_Y (279) 68
+    _X_DECREMENT (280) 69
+    _Y_DECREMENT (281) 70
+    _X_NOT_EQUAL_Y (282) 71
+    _PIN (283) 72 78 128 129
+    _NOT_OSRE (284) 73
+    _SIDE (285) 45 47
+    _EOL (286) 1 2
+    _PINS (287) 84 92
+    _PINDIRS (288) 96
+    _X (289) 85 93
+    _Y (290) 86 94
+    _NULL (291) 87 95
+    _ISR (292) 88 98
+    _OSR (293) 89 99
+    _PC (294) 97
+    _EXEC (295) 100
+    _IFFULL (296) 103 104 105
+    _IFEMPTY (297) 110 111 112
+    _BLOCK (298) 105 107 112 114
+    _NOBLOCK (299) 104 106 111 113
+    _CLEAR (300) 124
+    _NOWAIT (301) 122
+    _RELATIVE (302) 82
+    _STATUS (303) 90
+    _AUTOPUSH (304) 30
+    _AUTOPULL (305) 31
+    _BANG (306) 117
+    _COLON (307) 8
+    _COLON_COLON (308) 118
+    _CONFIG (309) 17
+    _PIO (310) 18
+    _SM (311) 19
+    _PIN_CONDITION (312) 20
+    _SET_PINS (313) 21
+    _IN_PINS (314) 22
+    _OUT_PINS (315) 23
+    _SIDE_SET_PINS (316) 24
+    _SIDE_SET_COUNT (317) 25
+    _USER_PROCESSOR (318) 33
+    _RX_FIFO_MERGE (319) 34
+    _TX_FIFO_MERGE (320) 35
+    _SHIFTCTL_PULL_THRESH (321) 26
+    _SHIFTCTL_PUSH_THRESH (322) 27
+    _SHIFTCTL_OUT_SHIFTDIR (323) 28
+    _SHIFTCTL_IN_SHIFTDIR (324) 29
+    _BINARY_DIGIT <ival> (325) 76 139
+    _HEX_NUMBER <ival> (326) 141
+    _BINARY_NUMBER <ival> (327) 140
+    _DECIMAL_NUMBER <ival> (328) 142
+    _DELAY <ival> (329) 46 47 60
+    _SYMBOL <sval> (330) 8 36 37 38 42 65 127
+    _EXECCTRL_STATUS_SEL (331) 32
+    _TX_LEVEL (332)
+    _RX_LEVEL (333)
+    _WRITE (334) 126
+    _READ (335) 127
+    _VAR (336) 36
+    _HIGH (337) 128
+    _LOW (338) 129
+    _CONTINUE_USER (339) 58
+
+
+Nonterminals, with rules where they appear
+
+    $accept (91)
+        on left: 0
+    statement_list (92)
+        on left: 1 2
+        on right: 0 2
+    statement (93)
+        on left: 3 4 5 6 7
+        on right: 1 2
+    label (94)
+        on left: 8
+        on right: 4
+    directive (95)
+        on left: 9 10 11 12 13 14 15 16
+        on right: 5
+    config_directive (96)
+        on left: 17
+        on right: 16
+    config_statement (97)
+        on left: 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36
+        on right: 17
+    define_directive (98)
+        on left: 37
+        on right: 9
+    program_directive (99)
+        on left: 38
+        on right: 10
+    origen_directive (100)
+        on left: 39
+        on right: 11
+    wrap_target_directive (101)
+        on left: 40
+        on right: 12
+    wrap_directive (102)
+        on left: 41
+        on right: 13
+    lang_opt_directive (103)
+        on left: 42
+        on right: 14
+    word_directive (104)
+        on left: 43
+        on right: 15
+    instruction_side (105)
+        on left: 44 45 46 47
+        on right: 6
+    instruction (106)
+        on left: 48 49 50 51 52 53 54 55 56 57
+        on right: 44 45 46 47
+    user_instruction_continue (107)
+        on left: 58 59
+        on right: 7
+    user_instruction_delay (108)
+        on left: 60 61
+        on right: 58 59
+    user_instruction (109)
+        on left: 62 63 64
+        on right: 60 61
+    jmp_instruction (110)
+        on left: 65
+        on right: 48
+    jmp_condition (111)
+        on left: 66 67 68 69 70 71 72 73
+        on right: 65
+    nop_instruction (112)
+        on left: 74
+        on right: 49
+    wait_instruction (113)
+        on left: 75
+        on right: 50
+    polarity (114)
+        on left: 76
+        on right: 75
+    wait_source (115)
+        on left: 77 78 79
+        on right: 75
+    index (116)
+        on left: 80
+        on right: 77 78 79
+    relative (117)
+        on left: 81 82
+        on right: 79 119
+    in_instruction (118)
+        on left: 83
+        on right: 51
+    source (119)
+        on left: 84 85 86 87 88 89 90
+        on right: 83 115
+    out_instruction (120)
+        on left: 91
+        on right: 52
+    destination (121)
+        on left: 92 93 94 95 96 97 98 99 100
+        on right: 91 115 125
+    push_instruction (122)
+        on left: 101
+        on right: 53
+    iffull_block (123)
+        on left: 102 103 104 105 106 107
+        on right: 101
+    pull_instruction (124)
+        on left: 108
+        on right: 54
+    ifempty_block (125)
+        on left: 109 110 111 112 113 114
+        on right: 108
+    mov_instruction (126)
+        on left: 115
+        on right: 55
+    operation (127)
+        on left: 116 117 118
+        on right: 115
+    irq_instruction (128)
+        on left: 119
+        on right: 56
+    irq_operation (129)
+        on left: 120 121 122 123 124
+        on right: 119
+    set_instruction (130)
+        on left: 125
+        on right: 57
+    write_instruction (131)
+        on left: 126
+        on right: 62
+    read_instruction (132)
+        on left: 127
+        on right: 63
+    pin_instruction (133)
+        on left: 128 129
+        on right: 64
+    expression <ival> (134)
+        on left: 130 131 132
+        on right: 37 39 43 80 83 91 125 130 131 136
+    mulexp <ival> (135)
+        on left: 133 134 135
+        on right: 130 131 132 133 134
+    primary <ival> (136)
+        on left: 136 137 138
+        on right: 133 134 135 137
+    number <ival> (137)
+        on left: 139 140 141 142
+        on right: 18 19 20 21 22 23 24 25 26 27 28 29 32 33 34 35 45 47 119 126 128 129 138
+
+
+State 0
+
+    0 $accept: . statement_list $end
+
+    _DEFINE       shift, and go to state 1
+    _PROGRAM      shift, and go to state 2
+    _ORIGEN       shift, and go to state 3
+    _WRAP_TARGET  shift, and go to state 4
+    _WRAP         shift, and go to state 5
+    _LANG_OPT     shift, and go to state 6
+    _WORD         shift, and go to state 7
+    _JMP          shift, and go to state 8
+    _NOP          shift, and go to state 9
+    _WAIT         shift, and go to state 10
+    _IN           shift, and go to state 11
+    _OUT          shift, and go to state 12
+    _PUSH         shift, and go to state 13
+    _PULL         shift, and go to state 14
+    _MOV          shift, and go to state 15
+    _SET          shift, and go to state 16
+    _IRQ          shift, and go to state 17
+    _PIN          shift, and go to state 18
+    _CONFIG       shift, and go to state 19
+    _SYMBOL       shift, and go to state 20
+    _WRITE        shift, and go to state 21
+    _READ         shift, and go to state 22
+
+    $default  reduce using rule 3 (statement)
+
+    statement_list             go to state 23
+    statement                  go to state 24
+    label                      go to state 25
+    directive                  go to state 26
+    config_directive           go to state 27
+    define_directive           go to state 28
+    program_directive          go to state 29
+    origen_directive           go to state 30
+    wrap_target_directive      go to state 31
+    wrap_directive             go to state 32
+    lang_opt_directive         go to state 33
+    word_directive             go to state 34
+    instruction_side           go to state 35
+    instruction                go to state 36
+    user_instruction_continue  go to state 37
+    user_instruction_delay     go to state 38
+    user_instruction           go to state 39
+    jmp_instruction            go to state 40
+    nop_instruction            go to state 41
+    wait_instruction           go to state 42
+    in_instruction             go to state 43
+    out_instruction            go to state 44
+    push_instruction           go to state 45
+    pull_instruction           go to state 46
+    mov_instruction            go to state 47
+    irq_instruction            go to state 48
+    set_instruction            go to state 49
+    write_instruction          go to state 50
+    read_instruction           go to state 51
+    pin_instruction            go to state 52
+
+
+State 1
+
+   37 define_directive: _DEFINE . _SYMBOL expression
+
+    _SYMBOL  shift, and go to state 53
+
+
+State 2
+
+   38 program_directive: _PROGRAM . _SYMBOL
+
+    _SYMBOL  shift, and go to state 54
+
+
+State 3
+
+   39 origen_directive: _ORIGEN . expression
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    expression  go to state 61
+    mulexp      go to state 62
+    primary     go to state 63
+    number      go to state 64
+
+
+State 4
+
+   40 wrap_target_directive: _WRAP_TARGET .
+
+    $default  reduce using rule 40 (wrap_target_directive)
+
+
+State 5
+
+   41 wrap_directive: _WRAP .
+
+    $default  reduce using rule 41 (wrap_directive)
+
+
+State 6
+
+   42 lang_opt_directive: _LANG_OPT . _SYMBOL
+
+    _SYMBOL  shift, and go to state 65
+
+
+State 7
+
+   43 word_directive: _WORD . expression
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    expression  go to state 66
+    mulexp      go to state 62
+    primary     go to state 63
+    number      go to state 64
+
+
+State 8
+
+   65 jmp_instruction: _JMP . jmp_condition _SYMBOL
+
+    _NOT_X          shift, and go to state 67
+    _NOT_Y          shift, and go to state 68
+    _X_DECREMENT    shift, and go to state 69
+    _Y_DECREMENT    shift, and go to state 70
+    _X_NOT_EQUAL_Y  shift, and go to state 71
+    _PIN            shift, and go to state 72
+    _NOT_OSRE       shift, and go to state 73
+
+    $default  reduce using rule 66 (jmp_condition)
+
+    jmp_condition  go to state 74
+
+
+State 9
+
+   74 nop_instruction: _NOP .
+
+    $default  reduce using rule 74 (nop_instruction)
+
+
+State 10
+
+   75 wait_instruction: _WAIT . polarity wait_source
+
+    _BINARY_DIGIT  shift, and go to state 75
+
+    polarity  go to state 76
+
+
+State 11
+
+   83 in_instruction: _IN . source expression
+
+    _PINS    shift, and go to state 77
+    _X       shift, and go to state 78
+    _Y       shift, and go to state 79
+    _NULL    shift, and go to state 80
+    _ISR     shift, and go to state 81
+    _OSR     shift, and go to state 82
+    _STATUS  shift, and go to state 83
+
+    source  go to state 84
+
+
+State 12
+
+   91 out_instruction: _OUT . destination expression
+
+    _PINS     shift, and go to state 85
+    _PINDIRS  shift, and go to state 86
+    _X        shift, and go to state 87
+    _Y        shift, and go to state 88
+    _NULL     shift, and go to state 89
+    _ISR      shift, and go to state 90
+    _OSR      shift, and go to state 91
+    _PC       shift, and go to state 92
+    _EXEC     shift, and go to state 93
+
+    destination  go to state 94
+
+
+State 13
+
+  101 push_instruction: _PUSH . iffull_block
+
+    _IFFULL   shift, and go to state 95
+    _BLOCK    shift, and go to state 96
+    _NOBLOCK  shift, and go to state 97
+
+    $default  reduce using rule 102 (iffull_block)
+
+    iffull_block  go to state 98
+
+
+State 14
+
+  108 pull_instruction: _PULL . ifempty_block
+
+    _IFEMPTY  shift, and go to state 99
+    _BLOCK    shift, and go to state 100
+    _NOBLOCK  shift, and go to state 101
+
+    $default  reduce using rule 109 (ifempty_block)
+
+    ifempty_block  go to state 102
+
+
+State 15
+
+  115 mov_instruction: _MOV . destination operation source
+
+    _PINS     shift, and go to state 85
+    _PINDIRS  shift, and go to state 86
+    _X        shift, and go to state 87
+    _Y        shift, and go to state 88
+    _NULL     shift, and go to state 89
+    _ISR      shift, and go to state 90
+    _OSR      shift, and go to state 91
+    _PC       shift, and go to state 92
+    _EXEC     shift, and go to state 93
+
+    destination  go to state 103
+
+
+State 16
+
+  125 set_instruction: _SET . destination expression
+
+    _PINS     shift, and go to state 85
+    _PINDIRS  shift, and go to state 86
+    _X        shift, and go to state 87
+    _Y        shift, and go to state 88
+    _NULL     shift, and go to state 89
+    _ISR      shift, and go to state 90
+    _OSR      shift, and go to state 91
+    _PC       shift, and go to state 92
+    _EXEC     shift, and go to state 93
+
+    destination  go to state 104
+
+
+State 17
+
+  119 irq_instruction: _IRQ . irq_operation number relative
+
+    _WAIT    shift, and go to state 105
+    _SET     shift, and go to state 106
+    _CLEAR   shift, and go to state 107
+    _NOWAIT  shift, and go to state 108
+
+    $default  reduce using rule 120 (irq_operation)
+
+    irq_operation  go to state 109
+
+
+State 18
+
+  128 pin_instruction: _PIN . number _HIGH
+  129                | _PIN . number _LOW
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 110
+
+
+State 19
+
+   17 config_directive: _CONFIG . config_statement
+
+    _AUTOPUSH               shift, and go to state 111
+    _AUTOPULL               shift, and go to state 112
+    _PIO                    shift, and go to state 113
+    _SM                     shift, and go to state 114
+    _PIN_CONDITION          shift, and go to state 115
+    _SET_PINS               shift, and go to state 116
+    _IN_PINS                shift, and go to state 117
+    _OUT_PINS               shift, and go to state 118
+    _SIDE_SET_PINS          shift, and go to state 119
+    _SIDE_SET_COUNT         shift, and go to state 120
+    _USER_PROCESSOR         shift, and go to state 121
+    _RX_FIFO_MERGE          shift, and go to state 122
+    _TX_FIFO_MERGE          shift, and go to state 123
+    _SHIFTCTL_PULL_THRESH   shift, and go to state 124
+    _SHIFTCTL_PUSH_THRESH   shift, and go to state 125
+    _SHIFTCTL_OUT_SHIFTDIR  shift, and go to state 126
+    _SHIFTCTL_IN_SHIFTDIR   shift, and go to state 127
+    _EXECCTRL_STATUS_SEL    shift, and go to state 128
+    _VAR                    shift, and go to state 129
+
+    config_statement  go to state 130
+
+
+State 20
+
+    8 label: _SYMBOL . _COLON
+
+    _COLON  shift, and go to state 131
+
+
+State 21
+
+  126 write_instruction: _WRITE . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 132
+
+
+State 22
+
+  127 read_instruction: _READ . _SYMBOL
+
+    _SYMBOL  shift, and go to state 133
+
+
+State 23
+
+    0 $accept: statement_list . $end
+    2 statement_list: statement_list . statement _EOL
+
+    $end          shift, and go to state 134
+    _DEFINE       shift, and go to state 1
+    _PROGRAM      shift, and go to state 2
+    _ORIGEN       shift, and go to state 3
+    _WRAP_TARGET  shift, and go to state 4
+    _WRAP         shift, and go to state 5
+    _LANG_OPT     shift, and go to state 6
+    _WORD         shift, and go to state 7
+    _JMP          shift, and go to state 8
+    _NOP          shift, and go to state 9
+    _WAIT         shift, and go to state 10
+    _IN           shift, and go to state 11
+    _OUT          shift, and go to state 12
+    _PUSH         shift, and go to state 13
+    _PULL         shift, and go to state 14
+    _MOV          shift, and go to state 15
+    _SET          shift, and go to state 16
+    _IRQ          shift, and go to state 17
+    _PIN          shift, and go to state 18
+    _CONFIG       shift, and go to state 19
+    _SYMBOL       shift, and go to state 20
+    _WRITE        shift, and go to state 21
+    _READ         shift, and go to state 22
+
+    $default  reduce using rule 3 (statement)
+
+    statement                  go to state 135
+    label                      go to state 25
+    directive                  go to state 26
+    config_directive           go to state 27
+    define_directive           go to state 28
+    program_directive          go to state 29
+    origen_directive           go to state 30
+    wrap_target_directive      go to state 31
+    wrap_directive             go to state 32
+    lang_opt_directive         go to state 33
+    word_directive             go to state 34
+    instruction_side           go to state 35
+    instruction                go to state 36
+    user_instruction_continue  go to state 37
+    user_instruction_delay     go to state 38
+    user_instruction           go to state 39
+    jmp_instruction            go to state 40
+    nop_instruction            go to state 41
+    wait_instruction           go to state 42
+    in_instruction             go to state 43
+    out_instruction            go to state 44
+    push_instruction           go to state 45
+    pull_instruction           go to state 46
+    mov_instruction            go to state 47
+    irq_instruction            go to state 48
+    set_instruction            go to state 49
+    write_instruction          go to state 50
+    read_instruction           go to state 51
+    pin_instruction            go to state 52
+
+
+State 24
+
+    1 statement_list: statement . _EOL
+
+    _EOL  shift, and go to state 136
+
+
+State 25
+
+    4 statement: label .
+
+    $default  reduce using rule 4 (statement)
+
+
+State 26
+
+    5 statement: directive .
+
+    $default  reduce using rule 5 (statement)
+
+
+State 27
+
+   16 directive: config_directive .
+
+    $default  reduce using rule 16 (directive)
+
+
+State 28
+
+    9 directive: define_directive .
+
+    $default  reduce using rule 9 (directive)
+
+
+State 29
+
+   10 directive: program_directive .
+
+    $default  reduce using rule 10 (directive)
+
+
+State 30
+
+   11 directive: origen_directive .
+
+    $default  reduce using rule 11 (directive)
+
+
+State 31
+
+   12 directive: wrap_target_directive .
+
+    $default  reduce using rule 12 (directive)
+
+
+State 32
+
+   13 directive: wrap_directive .
+
+    $default  reduce using rule 13 (directive)
+
+
+State 33
+
+   14 directive: lang_opt_directive .
+
+    $default  reduce using rule 14 (directive)
+
+
+State 34
+
+   15 directive: word_directive .
+
+    $default  reduce using rule 15 (directive)
+
+
+State 35
+
+    6 statement: instruction_side .
+
+    $default  reduce using rule 6 (statement)
+
+
+State 36
+
+   44 instruction_side: instruction .
+   45                 | instruction . _SIDE number
+   46                 | instruction . _DELAY
+   47                 | instruction . _SIDE number _DELAY
+
+    _SIDE   shift, and go to state 137
+    _DELAY  shift, and go to state 138
+
+    $default  reduce using rule 44 (instruction_side)
+
+
+State 37
+
+    7 statement: user_instruction_continue .
+
+    $default  reduce using rule 7 (statement)
+
+
+State 38
+
+   58 user_instruction_continue: user_instruction_delay . _CONTINUE_USER
+   59                          | user_instruction_delay .
+
+    _CONTINUE_USER  shift, and go to state 139
+
+    $default  reduce using rule 59 (user_instruction_continue)
+
+
+State 39
+
+   60 user_instruction_delay: user_instruction . _DELAY
+   61                       | user_instruction .
+
+    _DELAY  shift, and go to state 140
+
+    $default  reduce using rule 61 (user_instruction_delay)
+
+
+State 40
+
+   48 instruction: jmp_instruction .
+
+    $default  reduce using rule 48 (instruction)
+
+
+State 41
+
+   49 instruction: nop_instruction .
+
+    $default  reduce using rule 49 (instruction)
+
+
+State 42
+
+   50 instruction: wait_instruction .
+
+    $default  reduce using rule 50 (instruction)
+
+
+State 43
+
+   51 instruction: in_instruction .
+
+    $default  reduce using rule 51 (instruction)
+
+
+State 44
+
+   52 instruction: out_instruction .
+
+    $default  reduce using rule 52 (instruction)
+
+
+State 45
+
+   53 instruction: push_instruction .
+
+    $default  reduce using rule 53 (instruction)
+
+
+State 46
+
+   54 instruction: pull_instruction .
+
+    $default  reduce using rule 54 (instruction)
+
+
+State 47
+
+   55 instruction: mov_instruction .
+
+    $default  reduce using rule 55 (instruction)
+
+
+State 48
+
+   56 instruction: irq_instruction .
+
+    $default  reduce using rule 56 (instruction)
+
+
+State 49
+
+   57 instruction: set_instruction .
+
+    $default  reduce using rule 57 (instruction)
+
+
+State 50
+
+   62 user_instruction: write_instruction .
+
+    $default  reduce using rule 62 (user_instruction)
+
+
+State 51
+
+   63 user_instruction: read_instruction .
+
+    $default  reduce using rule 63 (user_instruction)
+
+
+State 52
+
+   64 user_instruction: pin_instruction .
+
+    $default  reduce using rule 64 (user_instruction)
+
+
+State 53
+
+   37 define_directive: _DEFINE _SYMBOL . expression
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    expression  go to state 141
+    mulexp      go to state 62
+    primary     go to state 63
+    number      go to state 64
+
+
+State 54
+
+   38 program_directive: _PROGRAM _SYMBOL .
+
+    $default  reduce using rule 38 (program_directive)
+
+
+State 55
+
+  139 number: _BINARY_DIGIT .
+
+    $default  reduce using rule 139 (number)
+
+
+State 56
+
+  141 number: _HEX_NUMBER .
+
+    $default  reduce using rule 141 (number)
+
+
+State 57
+
+  140 number: _BINARY_NUMBER .
+
+    $default  reduce using rule 140 (number)
+
+
+State 58
+
+  142 number: _DECIMAL_NUMBER .
+
+    $default  reduce using rule 142 (number)
+
+
+State 59
+
+  137 primary: '-' . primary
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    primary  go to state 142
+    number   go to state 64
+
+
+State 60
+
+  136 primary: '(' . expression ')'
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    expression  go to state 143
+    mulexp      go to state 62
+    primary     go to state 63
+    number      go to state 64
+
+
+State 61
+
+   39 origen_directive: _ORIGEN expression .
+  130 expression: expression . '+' mulexp
+  131           | expression . '-' mulexp
+
+    '+'  shift, and go to state 144
+    '-'  shift, and go to state 145
+
+    $default  reduce using rule 39 (origen_directive)
+
+
+State 62
+
+  132 expression: mulexp .
+  133 mulexp: mulexp . '*' primary
+  134       | mulexp . '/' primary
+
+    '*'  shift, and go to state 146
+    '/'  shift, and go to state 147
+
+    $default  reduce using rule 132 (expression)
+
+
+State 63
+
+  135 mulexp: primary .
+
+    $default  reduce using rule 135 (mulexp)
+
+
+State 64
+
+  138 primary: number .
+
+    $default  reduce using rule 138 (primary)
+
+
+State 65
+
+   42 lang_opt_directive: _LANG_OPT _SYMBOL .
+
+    $default  reduce using rule 42 (lang_opt_directive)
+
+
+State 66
+
+   43 word_directive: _WORD expression .
+  130 expression: expression . '+' mulexp
+  131           | expression . '-' mulexp
+
+    '+'  shift, and go to state 144
+    '-'  shift, and go to state 145
+
+    $default  reduce using rule 43 (word_directive)
+
+
+State 67
+
+   67 jmp_condition: _NOT_X .
+
+    $default  reduce using rule 67 (jmp_condition)
+
+
+State 68
+
+   68 jmp_condition: _NOT_Y .
+
+    $default  reduce using rule 68 (jmp_condition)
+
+
+State 69
+
+   69 jmp_condition: _X_DECREMENT .
+
+    $default  reduce using rule 69 (jmp_condition)
+
+
+State 70
+
+   70 jmp_condition: _Y_DECREMENT .
+
+    $default  reduce using rule 70 (jmp_condition)
+
+
+State 71
+
+   71 jmp_condition: _X_NOT_EQUAL_Y .
+
+    $default  reduce using rule 71 (jmp_condition)
+
+
+State 72
+
+   72 jmp_condition: _PIN .
+
+    $default  reduce using rule 72 (jmp_condition)
+
+
+State 73
+
+   73 jmp_condition: _NOT_OSRE .
+
+    $default  reduce using rule 73 (jmp_condition)
+
+
+State 74
+
+   65 jmp_instruction: _JMP jmp_condition . _SYMBOL
+
+    _SYMBOL  shift, and go to state 148
+
+
+State 75
+
+   76 polarity: _BINARY_DIGIT .
+
+    $default  reduce using rule 76 (polarity)
+
+
+State 76
+
+   75 wait_instruction: _WAIT polarity . wait_source
+
+    _GPIO  shift, and go to state 149
+    _IRQ   shift, and go to state 150
+    _PIN   shift, and go to state 151
+
+    wait_source  go to state 152
+
+
+State 77
+
+   84 source: _PINS .
+
+    $default  reduce using rule 84 (source)
+
+
+State 78
+
+   85 source: _X .
+
+    $default  reduce using rule 85 (source)
+
+
+State 79
+
+   86 source: _Y .
+
+    $default  reduce using rule 86 (source)
+
+
+State 80
+
+   87 source: _NULL .
+
+    $default  reduce using rule 87 (source)
+
+
+State 81
+
+   88 source: _ISR .
+
+    $default  reduce using rule 88 (source)
+
+
+State 82
+
+   89 source: _OSR .
+
+    $default  reduce using rule 89 (source)
+
+
+State 83
+
+   90 source: _STATUS .
+
+    $default  reduce using rule 90 (source)
+
+
+State 84
+
+   83 in_instruction: _IN source . expression
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    expression  go to state 153
+    mulexp      go to state 62
+    primary     go to state 63
+    number      go to state 64
+
+
+State 85
+
+   92 destination: _PINS .
+
+    $default  reduce using rule 92 (destination)
+
+
+State 86
+
+   96 destination: _PINDIRS .
+
+    $default  reduce using rule 96 (destination)
+
+
+State 87
+
+   93 destination: _X .
+
+    $default  reduce using rule 93 (destination)
+
+
+State 88
+
+   94 destination: _Y .
+
+    $default  reduce using rule 94 (destination)
+
+
+State 89
+
+   95 destination: _NULL .
+
+    $default  reduce using rule 95 (destination)
+
+
+State 90
+
+   98 destination: _ISR .
+
+    $default  reduce using rule 98 (destination)
+
+
+State 91
+
+   99 destination: _OSR .
+
+    $default  reduce using rule 99 (destination)
+
+
+State 92
+
+   97 destination: _PC .
+
+    $default  reduce using rule 97 (destination)
+
+
+State 93
+
+  100 destination: _EXEC .
+
+    $default  reduce using rule 100 (destination)
+
+
+State 94
+
+   91 out_instruction: _OUT destination . expression
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    expression  go to state 154
+    mulexp      go to state 62
+    primary     go to state 63
+    number      go to state 64
+
+
+State 95
+
+  103 iffull_block: _IFFULL .
+  104             | _IFFULL . _NOBLOCK
+  105             | _IFFULL . _BLOCK
+
+    _BLOCK    shift, and go to state 155
+    _NOBLOCK  shift, and go to state 156
+
+    $default  reduce using rule 103 (iffull_block)
+
+
+State 96
+
+  107 iffull_block: _BLOCK .
+
+    $default  reduce using rule 107 (iffull_block)
+
+
+State 97
+
+  106 iffull_block: _NOBLOCK .
+
+    $default  reduce using rule 106 (iffull_block)
+
+
+State 98
+
+  101 push_instruction: _PUSH iffull_block .
+
+    $default  reduce using rule 101 (push_instruction)
+
+
+State 99
+
+  110 ifempty_block: _IFEMPTY .
+  111              | _IFEMPTY . _NOBLOCK
+  112              | _IFEMPTY . _BLOCK
+
+    _BLOCK    shift, and go to state 157
+    _NOBLOCK  shift, and go to state 158
+
+    $default  reduce using rule 110 (ifempty_block)
+
+
+State 100
+
+  114 ifempty_block: _BLOCK .
+
+    $default  reduce using rule 114 (ifempty_block)
+
+
+State 101
+
+  113 ifempty_block: _NOBLOCK .
+
+    $default  reduce using rule 113 (ifempty_block)
+
+
+State 102
+
+  108 pull_instruction: _PULL ifempty_block .
+
+    $default  reduce using rule 108 (pull_instruction)
+
+
+State 103
+
+  115 mov_instruction: _MOV destination . operation source
+
+    _BANG         shift, and go to state 159
+    _COLON_COLON  shift, and go to state 160
+
+    $default  reduce using rule 116 (operation)
+
+    operation  go to state 161
+
+
+State 104
+
+  125 set_instruction: _SET destination . expression
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    expression  go to state 162
+    mulexp      go to state 62
+    primary     go to state 63
+    number      go to state 64
+
+
+State 105
+
+  123 irq_operation: _WAIT .
+
+    $default  reduce using rule 123 (irq_operation)
+
+
+State 106
+
+  121 irq_operation: _SET .
+
+    $default  reduce using rule 121 (irq_operation)
+
+
+State 107
+
+  124 irq_operation: _CLEAR .
+
+    $default  reduce using rule 124 (irq_operation)
+
+
+State 108
+
+  122 irq_operation: _NOWAIT .
+
+    $default  reduce using rule 122 (irq_operation)
+
+
+State 109
+
+  119 irq_instruction: _IRQ irq_operation . number relative
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 163
+
+
+State 110
+
+  128 pin_instruction: _PIN number . _HIGH
+  129                | _PIN number . _LOW
+
+    _HIGH  shift, and go to state 164
+    _LOW   shift, and go to state 165
+
+
+State 111
+
+   30 config_statement: _AUTOPUSH .
+
+    $default  reduce using rule 30 (config_statement)
+
+
+State 112
+
+   31 config_statement: _AUTOPULL .
+
+    $default  reduce using rule 31 (config_statement)
+
+
+State 113
+
+   18 config_statement: _PIO . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 166
+
+
+State 114
+
+   19 config_statement: _SM . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 167
+
+
+State 115
+
+   20 config_statement: _PIN_CONDITION . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 168
+
+
+State 116
+
+   21 config_statement: _SET_PINS . number number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 169
+
+
+State 117
+
+   22 config_statement: _IN_PINS . number number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 170
+
+
+State 118
+
+   23 config_statement: _OUT_PINS . number number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 171
+
+
+State 119
+
+   24 config_statement: _SIDE_SET_PINS . number number number number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 172
+
+
+State 120
+
+   25 config_statement: _SIDE_SET_COUNT . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 173
+
+
+State 121
+
+   33 config_statement: _USER_PROCESSOR . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 174
+
+
+State 122
+
+   34 config_statement: _RX_FIFO_MERGE . number number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 175
+
+
+State 123
+
+   35 config_statement: _TX_FIFO_MERGE . number number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 176
+
+
+State 124
+
+   26 config_statement: _SHIFTCTL_PULL_THRESH . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 177
+
+
+State 125
+
+   27 config_statement: _SHIFTCTL_PUSH_THRESH . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 178
+
+
+State 126
+
+   28 config_statement: _SHIFTCTL_OUT_SHIFTDIR . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 179
+
+
+State 127
+
+   29 config_statement: _SHIFTCTL_IN_SHIFTDIR . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 180
+
+
+State 128
+
+   32 config_statement: _EXECCTRL_STATUS_SEL . number number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 181
+
+
+State 129
+
+   36 config_statement: _VAR . _SYMBOL
+
+    _SYMBOL  shift, and go to state 182
+
+
+State 130
+
+   17 config_directive: _CONFIG config_statement .
+
+    $default  reduce using rule 17 (config_directive)
+
+
+State 131
+
+    8 label: _SYMBOL _COLON .
+
+    $default  reduce using rule 8 (label)
+
+
+State 132
+
+  126 write_instruction: _WRITE number .
+
+    $default  reduce using rule 126 (write_instruction)
+
+
+State 133
+
+  127 read_instruction: _READ _SYMBOL .
+
+    $default  reduce using rule 127 (read_instruction)
+
+
+State 134
+
+    0 $accept: statement_list $end .
+
+    $default  accept
+
+
+State 135
+
+    2 statement_list: statement_list statement . _EOL
+
+    _EOL  shift, and go to state 183
+
+
+State 136
+
+    1 statement_list: statement _EOL .
+
+    $default  reduce using rule 1 (statement_list)
+
+
+State 137
+
+   45 instruction_side: instruction _SIDE . number
+   47                 | instruction _SIDE . number _DELAY
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 184
+
+
+State 138
+
+   46 instruction_side: instruction _DELAY .
+
+    $default  reduce using rule 46 (instruction_side)
+
+
+State 139
+
+   58 user_instruction_continue: user_instruction_delay _CONTINUE_USER .
+
+    $default  reduce using rule 58 (user_instruction_continue)
+
+
+State 140
+
+   60 user_instruction_delay: user_instruction _DELAY .
+
+    $default  reduce using rule 60 (user_instruction_delay)
+
+
+State 141
+
+   37 define_directive: _DEFINE _SYMBOL expression .
+  130 expression: expression . '+' mulexp
+  131           | expression . '-' mulexp
+
+    '+'  shift, and go to state 144
+    '-'  shift, and go to state 145
+
+    $default  reduce using rule 37 (define_directive)
+
+
+State 142
+
+  137 primary: '-' primary .
+
+    $default  reduce using rule 137 (primary)
+
+
+State 143
+
+  130 expression: expression . '+' mulexp
+  131           | expression . '-' mulexp
+  136 primary: '(' expression . ')'
+
+    '+'  shift, and go to state 144
+    '-'  shift, and go to state 145
+    ')'  shift, and go to state 185
+
+
+State 144
+
+  130 expression: expression '+' . mulexp
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    mulexp   go to state 186
+    primary  go to state 63
+    number   go to state 64
+
+
+State 145
+
+  131 expression: expression '-' . mulexp
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    mulexp   go to state 187
+    primary  go to state 63
+    number   go to state 64
+
+
+State 146
+
+  133 mulexp: mulexp '*' . primary
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    primary  go to state 188
+    number   go to state 64
+
+
+State 147
+
+  134 mulexp: mulexp '/' . primary
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    primary  go to state 189
+    number   go to state 64
+
+
+State 148
+
+   65 jmp_instruction: _JMP jmp_condition _SYMBOL .
+
+    $default  reduce using rule 65 (jmp_instruction)
+
+
+State 149
+
+   77 wait_source: _GPIO . index
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    index       go to state 190
+    expression  go to state 191
+    mulexp      go to state 62
+    primary     go to state 63
+    number      go to state 64
+
+
+State 150
+
+   79 wait_source: _IRQ . index relative
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    index       go to state 192
+    expression  go to state 191
+    mulexp      go to state 62
+    primary     go to state 63
+    number      go to state 64
+
+
+State 151
+
+   78 wait_source: _PIN . index
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+    '-'              shift, and go to state 59
+    '('              shift, and go to state 60
+
+    index       go to state 193
+    expression  go to state 191
+    mulexp      go to state 62
+    primary     go to state 63
+    number      go to state 64
+
+
+State 152
+
+   75 wait_instruction: _WAIT polarity wait_source .
+
+    $default  reduce using rule 75 (wait_instruction)
+
+
+State 153
+
+   83 in_instruction: _IN source expression .
+  130 expression: expression . '+' mulexp
+  131           | expression . '-' mulexp
+
+    '+'  shift, and go to state 144
+    '-'  shift, and go to state 145
+
+    $default  reduce using rule 83 (in_instruction)
+
+
+State 154
+
+   91 out_instruction: _OUT destination expression .
+  130 expression: expression . '+' mulexp
+  131           | expression . '-' mulexp
+
+    '+'  shift, and go to state 144
+    '-'  shift, and go to state 145
+
+    $default  reduce using rule 91 (out_instruction)
+
+
+State 155
+
+  105 iffull_block: _IFFULL _BLOCK .
+
+    $default  reduce using rule 105 (iffull_block)
+
+
+State 156
+
+  104 iffull_block: _IFFULL _NOBLOCK .
+
+    $default  reduce using rule 104 (iffull_block)
+
+
+State 157
+
+  112 ifempty_block: _IFEMPTY _BLOCK .
+
+    $default  reduce using rule 112 (ifempty_block)
+
+
+State 158
+
+  111 ifempty_block: _IFEMPTY _NOBLOCK .
+
+    $default  reduce using rule 111 (ifempty_block)
+
+
+State 159
+
+  117 operation: _BANG .
+
+    $default  reduce using rule 117 (operation)
+
+
+State 160
+
+  118 operation: _COLON_COLON .
+
+    $default  reduce using rule 118 (operation)
+
+
+State 161
+
+  115 mov_instruction: _MOV destination operation . source
+
+    _PINS    shift, and go to state 77
+    _X       shift, and go to state 78
+    _Y       shift, and go to state 79
+    _NULL    shift, and go to state 80
+    _ISR     shift, and go to state 81
+    _OSR     shift, and go to state 82
+    _STATUS  shift, and go to state 83
+
+    source  go to state 194
+
+
+State 162
+
+  125 set_instruction: _SET destination expression .
+  130 expression: expression . '+' mulexp
+  131           | expression . '-' mulexp
+
+    '+'  shift, and go to state 144
+    '-'  shift, and go to state 145
+
+    $default  reduce using rule 125 (set_instruction)
+
+
+State 163
+
+  119 irq_instruction: _IRQ irq_operation number . relative
+
+    _RELATIVE  shift, and go to state 195
+
+    $default  reduce using rule 81 (relative)
+
+    relative  go to state 196
+
+
+State 164
+
+  128 pin_instruction: _PIN number _HIGH .
+
+    $default  reduce using rule 128 (pin_instruction)
+
+
+State 165
+
+  129 pin_instruction: _PIN number _LOW .
+
+    $default  reduce using rule 129 (pin_instruction)
+
+
+State 166
+
+   18 config_statement: _PIO number .
+
+    $default  reduce using rule 18 (config_statement)
+
+
+State 167
+
+   19 config_statement: _SM number .
+
+    $default  reduce using rule 19 (config_statement)
+
+
+State 168
+
+   20 config_statement: _PIN_CONDITION number .
+
+    $default  reduce using rule 20 (config_statement)
+
+
+State 169
+
+   21 config_statement: _SET_PINS number . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 197
+
+
+State 170
+
+   22 config_statement: _IN_PINS number . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 198
+
+
+State 171
+
+   23 config_statement: _OUT_PINS number . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 199
+
+
+State 172
+
+   24 config_statement: _SIDE_SET_PINS number . number number number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 200
+
+
+State 173
+
+   25 config_statement: _SIDE_SET_COUNT number .
+
+    $default  reduce using rule 25 (config_statement)
+
+
+State 174
+
+   33 config_statement: _USER_PROCESSOR number .
+
+    $default  reduce using rule 33 (config_statement)
+
+
+State 175
+
+   34 config_statement: _RX_FIFO_MERGE number . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 201
+
+
+State 176
+
+   35 config_statement: _TX_FIFO_MERGE number . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 202
+
+
+State 177
+
+   26 config_statement: _SHIFTCTL_PULL_THRESH number .
+
+    $default  reduce using rule 26 (config_statement)
+
+
+State 178
+
+   27 config_statement: _SHIFTCTL_PUSH_THRESH number .
+
+    $default  reduce using rule 27 (config_statement)
+
+
+State 179
+
+   28 config_statement: _SHIFTCTL_OUT_SHIFTDIR number .
+
+    $default  reduce using rule 28 (config_statement)
+
+
+State 180
+
+   29 config_statement: _SHIFTCTL_IN_SHIFTDIR number .
+
+    $default  reduce using rule 29 (config_statement)
+
+
+State 181
+
+   32 config_statement: _EXECCTRL_STATUS_SEL number . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 203
+
+
+State 182
+
+   36 config_statement: _VAR _SYMBOL .
+
+    $default  reduce using rule 36 (config_statement)
+
+
+State 183
+
+    2 statement_list: statement_list statement _EOL .
+
+    $default  reduce using rule 2 (statement_list)
+
+
+State 184
+
+   45 instruction_side: instruction _SIDE number .
+   47                 | instruction _SIDE number . _DELAY
+
+    _DELAY  shift, and go to state 204
+
+    $default  reduce using rule 45 (instruction_side)
+
+
+State 185
+
+  136 primary: '(' expression ')' .
+
+    $default  reduce using rule 136 (primary)
+
+
+State 186
+
+  130 expression: expression '+' mulexp .
+  133 mulexp: mulexp . '*' primary
+  134       | mulexp . '/' primary
+
+    '*'  shift, and go to state 146
+    '/'  shift, and go to state 147
+
+    $default  reduce using rule 130 (expression)
+
+
+State 187
+
+  131 expression: expression '-' mulexp .
+  133 mulexp: mulexp . '*' primary
+  134       | mulexp . '/' primary
+
+    '*'  shift, and go to state 146
+    '/'  shift, and go to state 147
+
+    $default  reduce using rule 131 (expression)
+
+
+State 188
+
+  133 mulexp: mulexp '*' primary .
+
+    $default  reduce using rule 133 (mulexp)
+
+
+State 189
+
+  134 mulexp: mulexp '/' primary .
+
+    $default  reduce using rule 134 (mulexp)
+
+
+State 190
+
+   77 wait_source: _GPIO index .
+
+    $default  reduce using rule 77 (wait_source)
+
+
+State 191
+
+   80 index: expression .
+  130 expression: expression . '+' mulexp
+  131           | expression . '-' mulexp
+
+    '+'  shift, and go to state 144
+    '-'  shift, and go to state 145
+
+    $default  reduce using rule 80 (index)
+
+
+State 192
+
+   79 wait_source: _IRQ index . relative
+
+    _RELATIVE  shift, and go to state 195
+
+    $default  reduce using rule 81 (relative)
+
+    relative  go to state 205
+
+
+State 193
+
+   78 wait_source: _PIN index .
+
+    $default  reduce using rule 78 (wait_source)
+
+
+State 194
+
+  115 mov_instruction: _MOV destination operation source .
+
+    $default  reduce using rule 115 (mov_instruction)
+
+
+State 195
+
+   82 relative: _RELATIVE .
+
+    $default  reduce using rule 82 (relative)
+
+
+State 196
+
+  119 irq_instruction: _IRQ irq_operation number relative .
+
+    $default  reduce using rule 119 (irq_instruction)
+
+
+State 197
+
+   21 config_statement: _SET_PINS number number .
+
+    $default  reduce using rule 21 (config_statement)
+
+
+State 198
+
+   22 config_statement: _IN_PINS number number .
+
+    $default  reduce using rule 22 (config_statement)
+
+
+State 199
+
+   23 config_statement: _OUT_PINS number number .
+
+    $default  reduce using rule 23 (config_statement)
+
+
+State 200
+
+   24 config_statement: _SIDE_SET_PINS number number . number number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 206
+
+
+State 201
+
+   34 config_statement: _RX_FIFO_MERGE number number .
+
+    $default  reduce using rule 34 (config_statement)
+
+
+State 202
+
+   35 config_statement: _TX_FIFO_MERGE number number .
+
+    $default  reduce using rule 35 (config_statement)
+
+
+State 203
+
+   32 config_statement: _EXECCTRL_STATUS_SEL number number .
+
+    $default  reduce using rule 32 (config_statement)
+
+
+State 204
+
+   47 instruction_side: instruction _SIDE number _DELAY .
+
+    $default  reduce using rule 47 (instruction_side)
+
+
+State 205
+
+   79 wait_source: _IRQ index relative .
+
+    $default  reduce using rule 79 (wait_source)
+
+
+State 206
+
+   24 config_statement: _SIDE_SET_PINS number number number . number
+
+    _BINARY_DIGIT    shift, and go to state 55
+    _HEX_NUMBER      shift, and go to state 56
+    _BINARY_NUMBER   shift, and go to state 57
+    _DECIMAL_NUMBER  shift, and go to state 58
+
+    number  go to state 207
+
+
+State 207
+
+   24 config_statement: _SIDE_SET_PINS number number number number .
+
+    $default  reduce using rule 24 (config_statement)

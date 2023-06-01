@@ -1,0 +1,50 @@
+;!
+;  @file /test_in.pio
+;  @brief Basic test of the PIO IN instruction
+;  @details
+;  Covers the different sources that can be used.
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+
+.config pio 0
+.config sm 0
+.config in_pins 1 2
+.config shiftctl_in_shiftdir 0        ; shift to the left
+.config user_processor 0
+.config user_var A
+
+; read a value from various sources: PIN, x, y, null, ISR, OSR
+
+    PIN 1, high [->] 
+    PIN 2, high
+    IN PINS, 2
+    PUSH
+    READ A
+    
+    SET X, 0x12345678
+    IN  X, 32
+    PUSH
+    READ A
+    
+    SET Y, 0x12345678
+    IN  Y, 32
+    PUSH
+    READ A
+    
+    PIN 1, high [->] 
+    PIN 2, high
+    IN PINS, 2
+    IN NULL, 4
+    IN, ISR, 2
+    PUSH
+    READ A
+
+    WRITE 3
+    PULL
+    IN OSR, 2
+    PUSH
+    READ A
+
+DONE:
+   JMP DONE

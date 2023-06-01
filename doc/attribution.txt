@@ -1,0 +1,4 @@
+three-kids-jumping-rope "Designed by Freepik" (www.freepik.com)
+spi.png from wikipedia (/en.wikipedia.org/wiki/Serial_Peripheral_Interface)
+timing diagram and timeline from Sparkfun (https://learn.sparkfun.com/tutorials/serial-peripheral-interface-spi/all)
+all other diagrams from AUTHORS

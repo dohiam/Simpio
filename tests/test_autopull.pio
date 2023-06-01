@@ -1,0 +1,30 @@
+;!
+;  @file /test_autopull.pio
+;  @brief Basic test of the autopull feature
+;  @details
+;  Outputs up to the pull threshold so that an auto-pull is performed. 
+;  Also an example of the configuration required to use auto-pull.
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+
+.config pio 0
+.config sm 0
+.config user_processor 0
+.config out_pins 0 2
+.config shiftctl_out_shiftdir 0
+.config autopull
+.config shiftctl_pull_thresh 2
+
+    WRITE 1 [->]
+    WRITE 2 [->]
+    WRITE 3
+    
+    PULL
+    SET X, 5
+OUTPUT:
+    OUT PINS, 1
+    JMP X-- OUTPUT
+    
+DONE:
+    JMP DONE

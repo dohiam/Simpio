@@ -1,0 +1,25 @@
+;!
+;  @file /test_set_timeline.pio
+;  @brief Test that sets up a GPIO history to test the Simpio timeline feature
+;  @details
+;  Creates an easily recognizable pattern on GPIO pins.
+;  To use this, run the timeline dialog and input PINs 1 to 5,
+;  then run this program until the last line, and then 
+;  Run the timeline window. 
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+
+.config pio 0
+.config sm 0
+.config set_pins 1 5
+
+    SET X, 25
+LOOP:
+    SET PINS, 21  [4] ; 10101
+    SET PINS, 10  [3] ; 01010
+    JMP X-- LOOP
+    
+END:
+    JMP END
+    

@@ -1,0 +1,38 @@
+;!
+;  @file /test_read.pio
+;  @brief Simple test of read, pin, and user variables
+;  @details
+;  Just sets a couple of pins, inputs the value, pushes it to the rx_fifo, and then reads it into a user var.
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+;
+
+.config pio 0
+.config sm 0
+.config in_pins 1 2
+.config shiftctl_in_shiftdir 0        ; shift to the left
+.config user_processor 0
+.config user_var A
+
+    PIN 1, high [->] 
+    PIN 2, high
+    IN PINS, 2
+    PUSH
+    READ A
+    
+    IN PINS, 2
+    PUSH
+    IN PINS, 2
+    PUSH
+    IN PINS, 2
+    PUSH
+    IN PINS, 2
+    PUSH
+    READ A [7] [->]
+    READ A [->]
+    READ A [->]
+    READ A
+
+DONE:
+   JMP DONE

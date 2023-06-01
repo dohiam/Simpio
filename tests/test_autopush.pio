@@ -1,0 +1,32 @@
+;!
+;  @file /test_autopush.pio
+;  @brief Basic test of the autopush feature
+;  @details
+;  Inputs up to the push threshold so that an auto-push is performed. 
+;  Also an example of the configuration required to use auto-push.
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+
+.config pio 0
+.config sm 0
+.config user_processor 0
+.config user_var A
+.config in_pins 0 2
+.config shiftctl_in_shiftdir 0
+.config autopush
+.config shiftctl_push_thresh 2
+
+    PIN 0, HIGH [->]
+    PIN 1, HIGH
+    READ A
+    READ A
+    READ A
+
+    SET X, 5
+INPUT:
+    IN PINS, 1
+    JMP X-- INPUT
+    
+DONE:
+    JMP DONE

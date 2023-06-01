@@ -1,0 +1,37 @@
+;!
+;  @file /test_write.pio
+;  @brief Tests the user pseudo WRITE instruction
+;  @details
+;  The WRITE instruction is a user instruction that simulates a user program
+;  writing a value to the output FIFO.
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+;
+; Simple Write test
+;
+
+.config pio 0
+.config sm 0
+.config out_pins 1 2
+.config shiftctl_out_shiftdir 1        ; shift from msb to lsb
+.config side_set_pins 20 1 1 0 ; base=20, num_pins=1, optional=1, pindirs=0 
+.config execctrl_status_sel 0 1 ; status all ones if TX is empty, else all zeros
+.config user_processor 0
+
+    WRITE 9                  ; TX FIFO <- 1 0 0 1
+    PULL
+    OUT PINS, 2              ; GPIOs 1,2 <- 1,0 
+    OUT PINS, 2              ; GPIOs 1,2 <- 0,1  
+
+    WRITE 1 [2] [->]
+    WRITE 2 [->]
+    WRITE 3 [->]
+    WRITE 4 
+    PULL
+    PULL
+    PULL
+    PULL
+
+DONE:
+   JMP DONE

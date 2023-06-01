@@ -1,0 +1,91 @@
+;!
+;  @file /test_mov.pio
+;  @brief Basic test of the PIO MOV instruction
+;  @details
+;  Tests the different sources, destinations, and operations on the MOV instruction.forms of JMP (different sources and operations for the jump condition).
+;  mov <destination>, ( op ) <source>
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+
+; pio 0, sm 0, input gpio 1, output gpio 5
+.config pio 0
+.config sm 0
+.config user_processor 0
+.config in_pins 0 2
+.config out_pins 10 2
+.config shiftctl_in_shiftdir 1        ; shift to the right
+.config execctrl_status_sel 0 1 ; 1=rx, 0=tx, status all ones if level of chosen FIFO is < specified number, else all zeros
+
+; first test PC and EXEC destnations which are a little tricky because they effect execution flow
+
+                    ; PC
+    SET X, 3        ; 0
+    MOV PC, X       ; 1   (jump to PC=3)
+    JMP ERROR       ; 2
+    SET X, 6        ; 3
+    MOV EXEC, X     ; 4   (instruction value of 6 is a jump to PC=6
+    JMP ERROR       ; 5
+    NOP             ; 6
+    
+; load some values into all possible sources (OSR=9, PINS[0..1]=11, X=3, Y=7, STATUS=all ones, ISR=3)
+
+    WRITE 2 [6]
+    PULL
+    PIN 0, high
+    PIN 1, high
+    SET X, 1
+    SET Y, 2
+    IN  X, 32
+      
+;   Destinations: PINS, X, Y, EXEC, PC, ISR, OSR
+
+    MOV PINS, PINS
+    MOV PINS, X
+    MOV PINS, Y
+    MOV PINS, STATUS
+    MOV PINS, ISR
+    MOV PINS, OSR
+
+    MOV X, PINS
+    MOV X, X
+    MOV X, Y
+    MOV X, STATUS
+    MOV X, ISR
+    MOV X, OSR
+
+    MOV Y, PINS
+    MOV Y, X
+    MOV Y, Y
+    MOV Y, STATUS
+    MOV Y, ISR
+    MOV Y, OSR
+
+    MOV ISR, PINS
+    MOV ISR, X
+    MOV ISR, Y
+    MOV ISR, STATUS
+    MOV ISR, ISR
+    MOV ISR, OSR
+
+    MOV OSR, PINS
+    MOV OSR, X
+    MOV OSR, Y
+    MOV OSR, STATUS
+    MOV OSR, ISR
+    MOV OSR, OSR
+
+;   Operations: Invert, Bit-Reverse    
+
+    SET X, 0xF0F0F0F0
+    MOV Y, ! X
+    SET X, 0xAAAA0000
+    MOV Y, :: X
+    JMP DONE
+    
+ERROR:
+    JMP ERROR
+
+DONE:
+    JMP DONE
+    
