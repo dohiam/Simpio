@@ -14,9 +14,10 @@
 .config pio 0
 .config sm 0
 .config out_pins 1 2
-.config shiftctl_out_shiftdir 1        ; shift from msb to lsb
-.config side_set_pins 20 1 1 0 ; base=20, num_pins=1, optional=1, pindirs=0 
-.config execctrl_status_sel 0 1 ; status all ones if TX is empty, else all zeros
+.config shiftctl_out 1 0 32       ; shift from msb to lsb, no autopull, no threshold
+.config side_set_pins 20          ; base=20
+.config side_set_count 1 1 0      ; num_pins=1, optional=1, pindirs=0 
+.config execctrl_status_sel 0 1   ; status all ones if TX is empty, else all zeros
 .config user_processor 0
 
     WRITE 9                  ; TX FIFO <- 1 0 0 1

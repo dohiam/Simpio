@@ -12,10 +12,8 @@
 .config sm 0
 .config user_processor 0
 .config user_var A
-.config in_pins 0 2
-.config shiftctl_in_shiftdir 0
-.config autopush
-.config shiftctl_push_thresh 2
+.config in_pins 0
+.config shiftctl_in_shiftdir 0  1 2   ; shiftdir=0, autopush, threshold 2
 
     PIN 0, HIGH [->]
     PIN 1, HIGH

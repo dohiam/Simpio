@@ -10,10 +10,10 @@
 .config pio 0
 .config sm 0
 .config out_pins 1 2
-.config shiftctl_out_shiftdir 1        ; shift from msb to lsb
-.config side_set_pins 20 1 1 0 ; base=20, num_pins=1, optional=1, pindirs=0 
+.config shiftctl_out_shiftdir 1 0 4    ; shift from msb to lsb, no autopull, threshold 4
+.config side_set_pins 20               ; base=20
+.config side_set_count 1 1 0           ; num_pins=1, optional=1, pindirs=0 
 .config execctrl_status_sel 0 1 ; 1=rx, 0=tx, status all ones if level of chosen FIFO is < specified number, else all zeros
-.config shiftctl_pull_thresh 4
 .config user_processor 0
 
     WRITE 9 [1]              ; delay, so next pull can block, TX FIFO <- 1 0 0 1

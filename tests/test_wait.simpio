@@ -14,7 +14,7 @@
 
 .config pio 0
 .config sm 0
-.config in_pins 9 2
+.config in_pins 9
 .config user_processor 0
 
     PIN 10, high [4]                  ; note that delay on user instructions is *before* instruction executes

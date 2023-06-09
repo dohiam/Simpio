@@ -1,17 +1,18 @@
 ;!
-;  @file /test_push.pio
-;  @brief Basic test of PIO PUSH instruction
+;  @file /test_delays.pio
+;  @brief Basic test of user processing delays
 ;  @details
-;  Test push variations: plain/block, noblock, iffull.
+;  Unlike PIO instruction delays, user processor delays happen before the
+;  instruction executes. The intent is wait until SM instructions get into
+;  the desired state before the user program does something.
 ;  
 ;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
 ; 
 
 .config pio 0
 .config sm 0
-.config in_pins 1 2
-.config shiftctl_in_shiftdir 0        ; shift to the left
-.config shiftctl_push_thresh 4
+.config in_pins 1
+.config shiftctl_in_shiftdir 0 0 4       ; shift to the left, no autopush, threshold 4
 .config user_processor 0
 .config user_var A
 
