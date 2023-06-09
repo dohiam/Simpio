@@ -73,52 +73,38 @@ void hardware_set_out_pins(int base, int num_pins, int line) {
 }
 
 
-void hardware_set_in_pins(int base, int num_pins, int line) {
+void hardware_set_in_pins(int base, int line) {
     CURRENT_SM.in_pins_base = base;
-    CURRENT_SM.in_pins_num = num_pins;
 }
 
-void hardware_set_side_set_pins(int base, int num_pins, int optional, int pindirs, int line) {
+void hardware_set_side_set_pins(int base, int line) {
     CURRENT_SM.side_set_pins_base = base;
+}
+    
+void hardware_set_side_set_count(int num_pins, int optional, int pindirs, int line) {
     CURRENT_SM.side_set_pins_num = num_pins;
     if (optional < 0 || optional > 1) {
-        PRINT("Error: side set optional invalid value %d on line %d; assuming 1 (true/optional)\n", optional, line);
+        PRINT("Error: side set optional invalid value %d on line %d; assuming 1 (true, optional)\n", optional, line);
         optional = 1;
     }
     sms[current_sm].side_set_pins_optional = optional;
     if (pindirs < 0 || pindirs > 1) {
-        PRINT("Error: side set pindirs invalid value %d on line %d; assuming 1 (true/optional)\n", pindirs, line);
-        pindirs = 1;
+        PRINT("Error: side set pindirs invalid value %d on line %d; assuming 0 (false, not pindirs)\n", pindirs, line);
+        pindirs = false;
     }
     CURRENT_SM.side_set_pindirs = pindirs;
 }
 
-void hardware_set_side_set_count(int num, int line) {
-    CURRENT_SM.side_set_count = num;
-}
-    
-void hardware_set_shiftctl_pull_thresh(int threshold) {
+void hardware_set_shiftctl_out(int dir, bool ap, int threshold, int line) {
+    CURRENT_SM.shiftctl_out_shiftdir = dir;
+    CURRENT_SM.autopull = ap;
     if (0<= threshold && threshold <= 31) CURRENT_SM.shiftctl_pull_thresh = threshold;
 }
 
-void hardware_set_shiftctl_push_thresh(int threshold) {
-    if (0<= threshold && threshold <= 31) CURRENT_SM.shiftctl_push_thresh = threshold;
-}
-
-void hardware_set_shiftctl_out_shiftdir(int dir) {
-    CURRENT_SM.shiftctl_out_shiftdir = dir;
-}
-
-void hardware_set_shiftctl_in_shiftdir(int dir) {
+void hardware_set_shiftctl_in(int dir, bool ap, int threshold, int line) {
     CURRENT_SM.shiftctl_in_shiftdir = dir;
-}
-
-void hardware_set_autopush() {
-    CURRENT_SM.autopush = true;
-}
-
-void hardware_set_autopull() {
-    CURRENT_SM.autopull = true;
+    CURRENT_SM.autopush = ap;
+    if (0<= threshold && threshold <= 31) CURRENT_SM.shiftctl_push_thresh = threshold;
 }
 
 void hardware_set_status_sel(int sel, uint8_t level) {
@@ -151,14 +137,15 @@ void hardware_set_sm_defaults(uint8_t sm) {
     THIS_SM.out_pins_base = 0;
     THIS_SM.out_pins_num = 0;
     THIS_SM.in_pins_base = 0;
-    THIS_SM.in_pins_num = 0;
+    THIS_SM.side_set_count = 0;
     THIS_SM.side_set_pins_optional = true;
     THIS_SM.side_set_pindirs = false;
-    THIS_SM.side_set_count = 0;
     THIS_SM.autopush = false;
     THIS_SM.autopull = false;
     THIS_SM.shiftctl_pull_thresh = -1; 
     THIS_SM.shiftctl_push_thresh = -1; 
+    THIS_SM.shiftctl_out_shiftdir = false;
+    THIS_SM.shiftctl_in_shiftdir = false;
     THIS_SM.program_name[0] = '\0';
     THIS_SM.pio_num = sm / 4;
     THIS_SM.pio = (void*) &(pios[sm / 4]);
@@ -272,15 +259,8 @@ bool hardware_irq_flag_set(uint8_t irq, bool set_or_clear) {
     else return false;
 }
 
-void hardware_fifo_merge(uint8_t pio_num, uint8_t sm_num, fifo_mode_t mode) {
-    int sm_index;
-    sm_t * sm;
-    fifo_t * f;
-    if (pio_num < 1 || pio_num > 2) return;
-    if (sm_num < 1 || sm_num > 4) return;
-    sm_index = ((pio_num-1) * 4) + (sm_num-1); 
-    sm = &(sms[sm_index]);
-    f = &(sm->fifo);
+void hardware_fifo_merge(fifo_mode_t mode) {
+    fifo_t * f = &(CURRENT_SM.fifo);
     fifo_init(f, mode);
 }
 

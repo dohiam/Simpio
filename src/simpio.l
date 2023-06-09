@@ -47,8 +47,6 @@ int temp_i;
 
 \n                       { return _EOL; } 
 
-!x                       { return _NOT_X; }
-!y                       { return _NOT_Y; }
 x--                      { return _X_DECREMENT; }
 y--                      { return _Y_DECREMENT; }
 x!=y                     { return _X_NOT_EQUAL_Y; }
@@ -90,24 +88,21 @@ noblock                  { return _NOBLOCK; }
 \.config                 { PRINTD("config statement\n"); return _CONFIG; }
 pio                      { return _PIO; }
 sm                       { return _SM; }
-pin_condition            { return _PIN_CONDITION; }
+jmp_pin                  { return _PIN_CONDITION; }
 set_pins                 { return _SET_PINS; }
 in_pins                  { return _IN_PINS; }
 out_pins                 { return _OUT_PINS; }
 side_set_pins            { return _SIDE_SET_PINS; }
 side_set_count           { return _SIDE_SET_COUNT; }
-shiftctl_pull_thresh     { return _SHIFTCTL_PULL_THRESH; }
-shiftctl_push_thresh     { return _SHIFTCTL_PUSH_THRESH; }
-shiftctl_out_shiftdir    { return _SHIFTCTL_OUT_SHIFTDIR; }
-shiftctl_in_shiftdir     { return _SHIFTCTL_IN_SHIFTDIR; }
-autopush                 { return _AUTOPUSH; }
-autopull                 { return _AUTOPULL; }
+shiftctl_out             { return _SHIFTCTL_OUT; }
+shiftctl_in              { return _SHIFTCTL_IN; }
 execctrl_status_sel      { return _EXECCTRL_STATUS_SEL; }
 tx_level                 { return _TX_LEVEL; }
 rx_level                 { return _RX_LEVEL; }
 user_processor           { return _USER_PROCESSOR; }
-rx_fifo_merge            { return _RX_FIFO_MERGE; }
-tx_fifo_merge            { return _TX_FIFO_MERGE; }
+fifo_merge               { return _FIFO_MERGE; }
+clkdiv                   { return _CLKDIV; }
+
 
 jmp                      { return _JMP; }
 nop                      { return _NOP; }

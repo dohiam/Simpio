@@ -239,10 +239,10 @@ The most common basic steps for reading a one byte value are:
 Reading GPIO (pin) values is accomplished using the IN instruction. One might think that this instruction would take a pin number as an argument, but which pin(s) to read is actually specified using a configuration statement:
 
 ```
-.config in_pins 1 2
+.config in_pins 1
 ```
 
-"in_pins" indicates that this configuration statement is for input pins. There is a separate config statement to specify which  pins to use for output. The first numeric argument says what is the starting, or base, pin, and the second numeric argument specifies how many pins are to be used for input. So the above statement says that pins 1 & 2 are input pins.
+"in_pins" indicates that this configuration statement is for input pins. There is a separate config statement to specify which  pins to use for output. The first numeric argument says what is the starting, or base, pin. 
 
 Given the above config statement, the following IN statement:
 
@@ -322,14 +322,16 @@ And the user program would read 96 hex, or 150 in decimal. Clearly then numbers 
 To configure input shifting to the left:
 
 ```
-.config shiftctl_in_shiftdir 0
+.config shiftctl_in 0 0 32
 ```
 
 And to configure input shifting to the right:
 
 ```
-.config shiftctl_in_shiftdir 1
+.config shiftctl_in 1 0 32
 ```
+
+> Note: the second and third arguments (autopush and push threshold) will be discussed later.
 
 #### Repeating instructions
 
@@ -355,15 +357,15 @@ Once the desired value is in the ISR, it needs to be moved to the input FIFO (ak
 However, PIO programming provides another way, called Auto-Push, that can be more convenient. By setting a "push threshold" to a certain number, and enabling auto-push, a PIO program could just do IN instructions so that whenever 8 bits have been shifted into the ISR, the value in the ISR is automatically pushed to the RX FIFO and the ISR cleared, ready for more input bits. For example:
 
 ```
-.config shiftctl_push_thresh 8
-.config autopush
+.config shiftctl_in 0 1 8
 .config in_pins 1 1
-.config shiftctl_in_shiftdir 0
 
 LOOP:
       IN PINS, 1
       JMP LOOP
 ```
+
+> In the shiftctrl_in configuration statement above, the second paramter (1) enables Auto-Push, and the third argument (8) says to automatically push after every 8 bits have been shifted in.
 
 #### Wait - Reading Based on Signal
 
@@ -389,10 +391,8 @@ LOOP:
 Pin 2 is the clock in this example. the 1 at the end of the WAIT statements above is a pin index. The index is added to the base pin number to get the pin number to actually read. Since the base is 1 and the index is one, the pint to wait on is 1+1=2. Note that this is different than the 1 at the end of the IN statement which is a 'bit count', i.e., the number of pins to read based on the base pin. Since the base pin is 1, one bit starting at pin 1 is just pin 1. If this seems a bit confusing, there is an alternative way to specify the pin on WAIT instructions which is to use the absolute pin number. So the above example could be changed to:
 
 ```
-.config shiftctl_push_thresh 8
-.config autopush
+.config shiftctl_in 0 1 8
 .config in_pins 1 1
-.config shiftctl_in_shiftdir 0
 
 LOOP:
       WAIT 0 GPIO, 2
@@ -410,10 +410,8 @@ A second way to indicate when a pin can be read is based on timing. Protocols th
 There are many ways to get a clock for I/O purposes and many issues to consider too, including the clock not going too fast or too slow and being stable & accurate. For this example, it is assumed that one has concluded that the right frequency to check I/O pins is every 20 instruction clock cycles. Basing a clock on instruction cycles is made easier by the fact that every PIO instruction takes exactly one clock cycle to execute. Another thing that helps is that a delay can be added to any instruction to make it take a number of additional clock cycles to complete. So the previous example can easily be modified to execute the IN instruction every 20 clock cycles:
 
 ```
-.config shiftctl_push_thresh 8
-.config autopush
+.config shiftctl_push_thresh 0 1 8
 .config in_pins 1 1
-.config shiftctl_in_shiftdir 0
 
 LOOP:
       IN PINS, 1 [18]
@@ -463,7 +461,7 @@ The preceding sections have provided enough information for a complete working e
 .config pio 0
 .config sm 0
 .config in_pins 1 2
-.config shiftctl_in_shiftdir 0        ; shift to the left
+.config shiftctl_in_shiftdir 0 0 32        ; shift to the left
 .config user_processor 0
 .config user_var A
 
@@ -752,9 +750,169 @@ TBD
 
 TBD
 
-Include section on branching logic and note about forward references fixed on second pass 
+
 
 ## Part 7 - Moving to Real Hardware
+
+### Moving to Real Hardware Using C Programming
+
+First note that there is a ("generate.py") Python script in the util folder of the git repository that will automatically perform all of the steps described in this section. However, the files generated are intended as a starting point in moving to real hardware, so it is still helpful to understand the steps involved so one can thoughtfully modify the generated files as needed.
+
+Before looking at the steps involved to translate a Simpio program file into one that can be built using the Pico SDK for real hardware, it is important to understand a few things about the structure of a PIO programming project using the SDK:
+
+1. When a PIO program file is processed by the pioasm tool, it creates a corresponding C header file that is then included in other C program files. A key thing in this generated header file is the binary code for all the PIO instructions inside of a C array (that can be loaded by the C program into real PIO hardware).
+2. The PIO program file can contain C programming statements placed in between the delimiters "% c-sdk {" and "%}". As per the examples in the SDK, this is generally used to define a function which initializes and configures the PIO program when it is loaded into PIO hardware. When the PIO program is assembled/compiled using the pioasm tool, the contents of this "c-sdk" section is copied verbatim into the generated header file.
+3. The rest of the project would be composed of one or more C program files. The steps described in this section (and performed by the "generate.py" script) involve only one additional C program file that defines the main function for the project which actually loads and starts the PIO program and performs  the same user actions of reading, writing, and setting pins that are in the Simpio pio program file.
+4. The steps required to load, configure, and start the PIO program are performed by C program(s) and could be anywhere in the C code of the project. The SDK examples show how some of the steps can be done in a main C function and the rest of the steps can be done inside of an "init" function defined in the c-sdk portion of the PIO program file. However, the process described in this section (and performed by the "generate.py" script) puts all of the steps inside of an init function contained in the c-sdk section of the PIO program file. This init function need only be called somewhere in the remaining C code of the project before actually doing reads and writes that interact with the running PIO program.
+5. The PIO program name defined in the PIO program file using the ".program" statement is used as part of the naming convention for various data structures and functions that are involved (and the "generate.py" script uses the program name to automatically generate these names).
+6. One additional file needed to build a project under the SDK is an appropriate CMakeLists.txt file that provides input to the CMAKE tool (which generates a Makefile that is input to the make tool to actually build the project). There are examples of these in the SDK but the exact format varies slightly between different versions of CMAKE. 
+
+With the above in mind, the following are the steps that need to be performed:
+
+1. Load the contents of the binary PIO program (contained in the array inside of the pioasm generated header file) to some PIO.
+1. Claim a state machine that will be used to execute the PIO program.
+1. Obtain a data structure that will contain all the PIO/SM configuration settings.
+1. For each PIO/SM configuration setting, update the data structure contained in the previous step with that setting.
+1. Initialize the PIO and state machine with that configuration data structure from the previous two steps.
+1. Enable the program (actually start it running).
+
+With these steps in mind, the following is the procedure used by the "generate.py" script to translate a single Simpio PIO program file into several output files. 
+
+1. The .program statement is used to get the program name which is used in some of the C code, and is also copied to the output pio file.
+2. The .config pio and .config sm statements are used to get which PIO and SM to be used (but are not copied to the output pio file). These PIO and SM numbers are used both in the PIO program init function and in the main function to do reads and writes to the correct FIFO.
+3. All other configuration statements are translated into corresponding C function calls and put inside of an init function called <program_name>_init and this init function is placed inside of the c-sdk section of the output PIO program file (and are also not copied to the output pio file). 
+4. In addition to the configuration function calls, additional function calls to load the program and obtain the configuration data structure are also put in the same init function described above.
+5. All user functions from the Simpio program file are translated into corresponding C function calls and placed inside a main function.
+6. All other lines from the Simpio PIO program file are simply copied to the output PIO program file.
+
+With the above translation steps in mind, the following files are produced:
+
+1. A <program_name>.pio file which contains the PIO program suitable for processing by the SDK and which contains a c-sdk section containing the init function that performs all the steps needed to load, configure, and start the PIO program on the indicated PIO and SM. Note that one should be careful to avoid a naming conflict with the input file, such as by using a .simpio extension instead of a .pio extension for all simpio PIO files.
+2. A <program_name>.c file which includes the header file that will be produced the pioasm tool as well as other required header files, and defines a main function that calls the init function and performs the same user actions (reads, writes) defined in the input Simpio PIO program file.
+3. A CMakeLists.txt file which can be used to build the project.
+
+With the above in mind, the following steps would build a Simpio PIO program file (named test.pio) that defines a pio program called pio_test into a complete running program on real hardware.
+
+```
+./generate.py test.simpio
+mkdir build
+cd build
+./cmake ..
+make
+```
+
+However, if the resulting Pico binary program file were loaded into real hardware and executed, it probably wouldn't do anything that one could observe. Additional work is generally required provide some useful and/or visible output from the program when it is running on real hardware.
+
+### An Example
+
+The Pico SDK provides a simple "hello world" type of PIO program which blinks the built-in LED. Although it is a great example of a simplest possible PIO program that can be observed running, it relies on C program logic and additional function calls to drive everything. The example described in this section will also blink the LED but does not rely on any additional C programming logic or function calls. Instead all the work is done inside the PIO program itself. This example can be run inside of Simpio and can also be automatically translated into a PIO program that will run on real hardware too.
+
+Here is the "blink.simpio" file which contains the PIO program:
+
+```
+.program blink
+.config pio 0
+.config sm 0
+.config user_processor 0
+
+.config out_pins 25 1           ; output pin is the built-in LED at GPIO 25
+.config jmp_pin 25              ; used to toggle LED based on its current value
+.config set_pins 25 1           ; to be able to set the LED to the desired value
+.config clkdiv 65535
+
+;
+; Simple blink program
+;
+
+    WRITE   600                 ; whatever value written is used as the delay amount
+    PULL
+blink:
+    MOV     X, OSR              ; get new value or X
+    JMP     PIN, led_off        ; if led is on, tuggle it off
+led_on:
+    SET     PINS, 1             ; else toggle led on
+    JMP     over_led_off        
+led_off:
+    SET     PINS, 0
+over_led_off:                   ; endif
+    MOV     Y, X                ; save X because decrement destroys it
+delay:
+    JMP     X--, delay          ; delay the amount indicated by the value written
+    MOV     X, Y                ; restore value of x
+    PULL    noblock             ; w/noblock, if nothing in FIFO, value pulled from X
+    JMP blink                   ; and repeat
+
+```
+
+In a nutshell, this program allows a user program to write a delay value. The PIO program uses this delay value to pause in between toggling PIN 25 on and off. The best way to understand this program is to load it into the Simpio simulator and watch it run:
+
+```
+simpio blink.simpio
+```
+
+A suggested sequence of action inside the simulator are:
+
+1. Press PF4 to build the program
+2. Repeatedly press PF6, observing the effects on the OSR, X & Y registers, and GPIO PIN 25, until reaching the last statement "JMP blink".
+3. Press PF7 to set a breakpoing on this last line
+4. Repeatedly press PF5 to run several iterations of the program (from the blink label to the "JMP blink" statement.) After each iteration, not the change to the clock count as well as GPIO PIN 25. Note that the clock count jumps a little over 60 cycles with each iteration and that the GPIO PIN toggles between one and zero. 
+
+Before going on to real hardware, first note a few new things used in this PIO program that have not been previously discussed:
+
+- The use of "JMP PIN" which jumps or not based on the value of a defined "JMP PIN". The GPIO to be used for this is defined by a ".config Jmp_pin 25" statement to indicate the jump should happen based on the value of GPIO PIN 25; this is what allows the program to toggle the next value of PIN 25 based on its current value.
+- The use of a ".config clkdiv 65535" statement. This configuration changes the frequency of the PIO/SM clock relative to the Pico system clock. Literally, the system clock frequency is divided by the clkdiv amount to get the PIO/SM clock frequency. This feature has no value inside of a Simpio simulation because there is no Pico system in the simulator and therefore no Pico system clock to be relative to. However, this is often useful in translating Simpio PIO programs to ones for real hardware because real hardware often runs too fast and needs to be slowed down. If this clkdiv feature was not used in this blink.simpio example, the LED would blink too fast without using an extremely large delay value, requiring to simulation to cycle many hundreds of thousands of times, doing nothing but decrementing a counter. 
+- The use of a "pull noblock" statement. In addition to the somewhat obvious behavior of letting the PIO program continue to run (and blink the LED) when there is no value waiting in the FIFO to pull, there is an important side-effect used as well. This side effect is that the OSR is loaded with the current value of X instead of a value pulled from the FIFO. As this program runs, this side-effect is what allows the X register to either get a new delay value if there is one, or else retain the old delay value. 
+
+With the above in mind, the following steps can be performed from a directory containing blink.simpio and the generate.py script.
+
+```
+./generate.py test.simpio
+mkdir build
+cd build
+./cmake ..
+make
+```
+
+Then simply copy the blink.uf2 file to a standard Pico board when it is in mass storage mode and observe the blinking LED.
+
+### Additional Details to Map Simpio Statements to SDK Functions
+
+The configuration performed by .config statements under Simpio pio is performed by function calls using the Pico SDK. However, there is a direct correspondence between the .config statements and  the corresponding C functions; the same arguments and order is used in each of them. This makes it very straightforward to create the corresponding function calls using the following mapping (and this is exactly what the "generate.py" script does). The following is a summary of the mapping:
+
+> `.config jmp_pin #                       `
+> `=>  void sm_config_set_jmp_pin (pio_sm_config *c, uint pin=#)`   
+>
+> `.config set_pins # #                    `
+> `=>  void pio_sm_set_set_pins (PIO pio, uint sm, uint set_base=#, uint set_count=#)`
+>
+> `.config in_pins #                       `
+> `=>  void sm_config_set_in_pins (pio_sm_config *c, uint in_base=#)`
+>
+> `.config out_pins # #                    `
+> `=>  void sm_config_set_out_pins (pio_sm_config *c, uint out_base=#, uint out_count=#)`
+> (and also pio_gpio_init(pio, pin_number); for each output PIN used )
+>
+> `.config side_set_pins  #                `
+> `=>  void sm_config_set_sideset_pins (pio_sm_config *c, uint sideset_base)`
+>
+> `.config side_set_count # # #            `
+> `=>  void sm_config_set_sideset (pio_sm_config *c, uint bit_count, bool optional, bool pindirs)`
+>
+> `.config shiftctl_out # # #              `
+> `=>  void sm_config_set_out_shift (pio_sm_config *c, bool shift_right, bool autopull, uint pull_threshold)`
+>
+> `.config shiftctl_in # # #               `
+> `=>  void sm_config_set_in_shift (pio_sm_config *c, bool shift_right, bool autopush, uint push_threshold)`
+>
+> `.config execctl_status_sel # #          `
+> `=>  void sm_config_set_mov_status (pio_sm_config *c, enum pio_mov_status_type status_sel, uint status_n)`
+>
+> `.config fifo_merge #                    `
+> `=>  void sm_config_set_fifo_join (pio_sm_config *c, enum pio_fifo_join join)`
+
+One can also study the translation steps performed in the "generate.py" script as well as studying the output files it produces to learn more. One can also modify the "generate.py" script as desired to customize the output for one's particular needs (and tastes in structuring the output code organization).
+
+### Moving to Real Hardware Using MicroPython
 
 TBD
 

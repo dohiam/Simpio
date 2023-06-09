@@ -608,7 +608,8 @@ bool run_jmp_instruction(instruction_t * instruction) {
             if (sm->scratch_x != sm->scratch_y) branch = true;
             break;
         case pin_condition:
-            if (0 <= sm->pin_condition && sm->pin_condition <= 31 && hardware_get_gpio(pin_condition)) branch = true;
+            PRINTD("pin condition %d = %d \n", sm->pin_condition,hardware_get_gpio(sm->pin_condition));
+            if (0 <= sm->pin_condition && sm->pin_condition <= 31 && hardware_get_gpio(sm->pin_condition)) branch = true;
             break;
         case not_osre:
             /* not true if bits shifted since the last pull does not yet meet the configured pull shift threshold */
@@ -744,7 +745,7 @@ bool run_in_instruction(instruction_t * instruction) {
     /* if there was an autopush that stalled previously, then we couldn't complete previously so we need to resume shifting now instead of starting anew */
     if (sm->shift_in_resume_count > 0) bits_todo = sm->shift_in_resume_count;
     else {
-        if (instruction->source == pins_source) bits_todo = (sm->in_pins_num > instruction->bit_count) ? instruction->bit_count : sm->in_pins_num;
+        if (instruction->source == pins_source) bits_todo = instruction->bit_count;
         else bits_todo = instruction->bit_count;
     }
     stalled = false;
@@ -813,6 +814,8 @@ bool run_pull_instruction(instruction_t * instruction) {
         else {
             PRINTI("pulling X because FIFO empty and nonblocking\n");
             sm->osr = sm->scratch_x;
+            sm->shift_out_count = 0;
+            sm->shift_out_resume_count = 0;
             return true;  /* simulate the block by returning that this instruction wasn't completed */
         }
     }
@@ -965,11 +968,15 @@ bool run_mov_instruction(instruction_t * instruction) {
             value = 0;
             // for highest numbered pin downto base pin, set lsb to pin value, shifting up to make room for each pin value added
             PRINTI("moving from pins: ");
-            for (pin_num = sm->in_pins_base + sm->in_pins_num -1; pin_num >= sm->in_pins_base; pin_num--) {
+            pin_num = 32; /* as per datasheet, always reads 32 consecutive pins, wrapping at pin 31 */
+            int pin_count = 0;
+            for (pin_num = sm->in_pins_base; pin_count < 32; pin_count++) {
                 pin_value = hardware_get_gpio(pin_num);
                 PRINTI("%d", pin_value);
                 value = value << 1;
                 value += pin_value;
+                if (pin_num == 31) pin_num = 0;
+                else pin_num = pin_num + 1;
             }
             PRINTI(" ");
             break;

@@ -9,4 +9,4 @@
 #   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
 # 
 set -x
-ls -1 *.pio | xargs ./run_test.sh 
+ls -1 *.simpio | xargs ./run_test.sh 

@@ -330,7 +330,7 @@ void printf_hardware_configuration() {
             if (sm->pio_num == pio->this_num) {
                 printf("      sm: %d\n", sm->this_num);
                 printf("         pc: %d\n", sm->pc);
-                printf("         in   pins base: %d  num_pins: %d\n", sm->in_pins_base, sm->in_pins_num);
+                printf("         in   pins base: %d\n", sm->in_pins_base);
                 printf("         out  pins base: %d  num_pins: %d\n", sm->out_pins_base, sm->out_pins_num);
                 printf("         set  pins base: %d  num_pins: %d\n", sm->set_pins_base, sm->set_pins_num);
                 printf("         sset pins base: %d  num_pins: %d  optional: %d\n", sm->side_set_pins_base, sm->side_set_pins_num, sm->side_set_pins_optional);

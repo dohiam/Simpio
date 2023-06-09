@@ -119,8 +119,8 @@ int simpio_test_build(int argc, char** argv)
 %token _AUTOPUSH _AUTOPULL
 %token _BANG _COLON _COLON_COLON
 
-%token _CONFIG _PIO _SM _PIN_CONDITION _SET_PINS _IN_PINS _OUT_PINS _SIDE_SET_PINS _SIDE_SET_COUNT _USER_PROCESSOR _RX_FIFO_MERGE _TX_FIFO_MERGE
-%token _SHIFTCTL_PULL_THRESH _SHIFTCTL_PUSH_THRESH _SHIFTCTL_OUT_SHIFTDIR _SHIFTCTL_IN_SHIFTDIR
+%token _CONFIG _PIO _SM _PIN_CONDITION _SET_PINS _IN_PINS _OUT_PINS _SIDE_SET_PINS _SIDE_SET_COUNT _USER_PROCESSOR _FIFO_MERGE _CLKDIV
+%token _SHIFTCTL_OUT _SHIFTCTL_IN
 
 %token <ival> _BINARY_DIGIT _HEX_NUMBER _BINARY_NUMBER _DECIMAL_NUMBER _DELAY
 %token <sval> _SYMBOL
@@ -156,20 +156,16 @@ config_directive: _CONFIG config_statement
 config_statement: _PIO number { hardware_set_pio($2, line_count); } | _SM number { hardware_set_sm($2, line_count); } | 
                   _PIN_CONDITION number { hardware_set_pin_condition($2); } |
                   _SET_PINS number number { hardware_set_set_pins($2,$3, line_count); } | 
-                  _IN_PINS number number { hardware_set_in_pins($2,$3, line_count); } | 
+                  _IN_PINS number { hardware_set_in_pins($2, line_count); } | 
                   _OUT_PINS number number { hardware_set_out_pins($2,$3, line_count); } |
-                  _SIDE_SET_PINS number number number number { hardware_set_side_set_pins($2, $3, $4, $5, line_count); } |
-                  _SIDE_SET_COUNT number {hardware_set_side_set_count($2, line_count); } |
-                  _SHIFTCTL_PULL_THRESH number { hardware_set_shiftctl_pull_thresh($2); } |
-                  _SHIFTCTL_PUSH_THRESH number { hardware_set_shiftctl_push_thresh($2); } |
-                  _SHIFTCTL_OUT_SHIFTDIR number { hardware_set_shiftctl_out_shiftdir($2); } |
-                  _SHIFTCTL_IN_SHIFTDIR number { hardware_set_shiftctl_in_shiftdir($2); } |
-                  _AUTOPUSH { hardware_set_autopush(); } | _AUTOPULL { hardware_set_autopull(); } |
+                  _SIDE_SET_PINS number {hardware_set_side_set_pins($2, line_count); } |
+                  _SIDE_SET_COUNT number number number { hardware_set_side_set_count($2, $3, $4, line_count); } |
+                  _SHIFTCTL_OUT number number number { hardware_set_shiftctl_out($2, $3, $4, line_count); } |
+                  _SHIFTCTL_IN number number number { hardware_set_shiftctl_in($2, $3, $4, line_count); } |
                   _EXECCTRL_STATUS_SEL number number {hardware_set_status_sel($2, $3); } |
                   _USER_PROCESSOR number{hardware_set_up($2, line_count);} |
-                  _RX_FIFO_MERGE number number { hardware_fifo_merge($2, $3, RX_ONLY); } |
-                  _TX_FIFO_MERGE number number { hardware_fifo_merge($2, $3, TX_ONLY); } |
-                  _VAR _SYMBOL { instruction_var_define($2); }
+                  _FIFO_MERGE number { hardware_fifo_merge($2); } |
+                  _CLKDIV number;
 
 define_directive: _DEFINE _SYMBOL expression { PRINTD("%s = %d", $2, $3); instruction_add_define($2, $3, line_count); } 
 

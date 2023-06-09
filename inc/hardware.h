@@ -57,7 +57,6 @@ typedef struct {
     uint8_t  out_pins_base;             /* base gpio for output operations */
     uint8_t  out_pins_num;              /* number of gpios to set for output operations, starting at base */
     uint8_t  in_pins_base;              /* base gpio for input operations */
-    uint8_t  in_pins_num;               /* number of gpios to set for input operations, starting at base */
     uint8_t  side_set_pins_base;        /* base gpio for side set operations */
     uint8_t  side_set_pins_num;         /* number of gpios to set for side set operations, starting at base */
     bool     side_set_pins_optional;    /* whether side set is optional or required on each instruction */
@@ -144,21 +143,17 @@ DEFINE_ENUMERATOR(user_processor_t, hardware_user_processor)
 void hardware_set_pin_condition(int pin_num);
 void hardware_set_set_pins(int base, int num_pins, int line);
 void hardware_set_out_pins(int base, int num_pins, int line);
-void hardware_set_in_pins(int base, int num_pins, int line);
-void hardware_set_side_set_pins(int base, int num_pins, int optional, int pindirs, int line);
-void hardware_set_side_set_count(int num, int line);
+void hardware_set_in_pins(int base, int line);
+void hardware_set_side_set_pins(int base, int line);
+void hardware_set_side_set_count(int num_pins, int optional, int pindirs, int line);
 void hardware_set_program_name(char* name);
-void hardware_set_shiftctl_pull_thresh(int threshold);
-void hardware_set_shiftctl_push_thresh(int threshold);
-void hardware_set_shiftctl_out_shiftdir(int dir);
-void hardware_set_shiftctl_in_shiftdir(int dir);
-void hardware_set_autopush();
-void hardware_set_autopull();
+void hardware_set_shiftctl_out(int dir, bool ap, int threshold, int line);
+void hardware_set_shiftctl_in(int dir, bool ap, int threshold, int line);
 void hardware_set_status_sel(int sel, uint8_t level);
 void hardware_set_gpio(uint8_t num, bool val);
 void hardware_set_gpio_dir(uint8_t num, bool val);
 void hardware_set_irq(uint8_t irq_num, bool value);
-void hardware_fifo_merge(uint8_t pio_num, uint8_t sm_num, fifo_mode_t mode);
+void hardware_fifo_merge(fifo_mode_t mode);
               
 void hardware_set_system_defaults();
 void hardware_reset();
