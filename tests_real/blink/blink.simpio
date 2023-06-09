@@ -1,0 +1,41 @@
+;!
+;  @file /blink.pio
+;  @brief Real test of blinking an LED
+;  @details
+;  Uses built-in LED at GPIO 25 with a frequency determined by using the value written as a delay value.
+;  
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+
+.program blink
+.config pio 0
+.config sm 0
+.config user_processor 0
+
+.config out_pins 25 1           ; output pin is the built-in LED at GPIO 25
+.config jmp_pin 25              ; used to toggle LED based on its current value
+.config set_pins 25 1           ; to be able to set the LED to the desired value
+.config clkdiv 65535
+
+;
+; Simple blink program
+;
+
+    WRITE   600                 ; whatever value written is used as the delay amount
+    PULL
+blink:
+    MOV     X, OSR              ; get new value or X
+    JMP     PIN, led_off        ; if led is on, tuggle it off
+led_on:
+    SET     PINS, 1             ; else toggle led on
+    JMP     over_led_off        
+led_off:
+    SET     PINS, 0
+over_led_off:                   ; endif
+    MOV     Y, X                ; save X because decrement destroys it
+delay:
+    JMP     X--, delay          ; delay the amount indicated by the value written
+    MOV     X, Y                ; restore value of x
+    PULL    noblock             ; w/noblock, if nothing in FIFO, value pulled from X
+    JMP blink                   ; and repeat
