@@ -1,5 +1,5 @@
 ;!
-;  @file /test_wait.pio
+;  @file /test_wait.simpio
 ;  @brief Tests the PIO WAIT instruction
 ;  @details
 ;  Sets up an interaction between two different PIO programs, 

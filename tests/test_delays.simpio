@@ -1,5 +1,5 @@
 ;!
-;  @file /test_delays.pio
+;  @file /test_delays.simpio
 ;  @brief Basic test of user processing delays
 ;  @details
 ;  Unlike PIO instruction delays, user processor delays happen before the

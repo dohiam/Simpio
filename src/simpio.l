@@ -9,13 +9,13 @@
  * 
  **********************************************************************************/
 #include <stdio.h>
+#include "constants.h"
 #include "y.tab.h"
 #include "instruction.h"
 #include "print.h"
 extern instruction_t ci;  /* owned by simpio.y */
 
 /* todo: add all these to a project configuration file */
-#define SYMBOL_MAX 32 
 
 int line_count = 0;
 
@@ -84,6 +84,7 @@ noblock                  { return _NOBLOCK; }
 \.wrap                   { PRINTD("wrap statement\n"); return _WRAP; }
 \.lang_opt               { PRINTD("lang_opt statement\n"); return _LANG_OPT; }
 \.word                   { PRINTD("word statement\n"); return _WORD; }
+\.data                   { PRINTD("data statement\n"); return _DATA_CONFIG; }
 
 \.config                 { PRINTD("config statement\n"); return _CONFIG; }
 pio                      { return _PIO; }
@@ -117,6 +118,11 @@ set                      { return _SET; }
 
 write                    { return _WRITE; }
 read                     { return _READ; }
+repeat                   { return _REPEAT; }
+print                    { return _PRINT; }
+data                     { return _DATA; }
+exit                     { return _EXIT; }
+readln                   { return _READLN; }
 user_var                 { return _VAR; }
 high                     { return _HIGH; }
 low                      { return _LOW;  }
@@ -133,6 +139,8 @@ PUBLIC                   { return _PUBLIC; }
 [0-9]+                   { yylval.ival = strtol(yytext, NULL, 10); return _DECIMAL_NUMBER; }
 
 [A-Za-z][0-9A-Za-z_]*    { PRINTD("Symbol:'%s'",yytext); snprintf(yylval.sval, SYMBOL_MAX, "%s", yytext); return _SYMBOL; }
+
+\"([^\\\"]|\\.)*\"       { PRINTD("Quoted String:'%s'",yytext); snprintf(yylval.strval, SYMBOL_MAX, "%s", &(yytext[1])); yylval.strval[yyleng-2]='\0'; return _STRING;}
 
 \[[0-9]+\]               { temp_i = strlen(yytext); yytext[temp_i-1]=0; yylval.ival = strtol(yytext+1, NULL, 10); PRINTD("Delay:'%d'",yylval.ival); return _DELAY; }
 

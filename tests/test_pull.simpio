@@ -1,5 +1,5 @@
 ;!
-;  @file /test_pull.pio
+;  @file /test_pull.simpio
 ;  @brief Basic test of PIO PULL instruction
 ;  @details
 ;  Test of pull variations, including plain/block, noblock, and ifempty.

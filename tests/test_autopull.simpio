@@ -1,5 +1,5 @@
 ;!
-;  @file /test_autopull.pio
+;  @file /test_autopull.simpio
 ;  @brief Basic test of the autopull feature
 ;  @details
 ;  Outputs up to the pull threshold so that an auto-pull is performed. 

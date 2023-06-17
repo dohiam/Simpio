@@ -744,7 +744,79 @@ DONE1:
 
 ## Part 5 - Some Complete Programs
 
-TBD
+### Parallel I/O
+
+This example outputs a sequence of bytes, one byte at a time on 8 GPIO pins. This is called "parallel" because it sends all 8 bits in the byte together at the same time instead of one bit at a time (as in a serial interface). It involves two PIO programs - one to output the bytes and another to input the bytes. There is a user program associated with each PIO program - one user program to write bytes and the other to read them. The whole example (all 4 parts) is in test_data.simpio file in the tests folder. This file can be loaded and run in Simpio to observe the complete process of execution to send and receive a sequence of bytes using this simple protocol.
+
+The first PIO program in this example, which outputs bytes, looks like:
+
+```
+.config pio 0
+.config sm 0
+.config set_pins 10 1
+.config out_pins 0 8
+.config shiftctl_out 0 0 8
+
+    SET PINS, 0
+output_loop:
+    PULL
+    OUT PINS, 8
+    SET PINS, 1 [10]
+    SET PINS, 0 [10]
+    JMP output_loop
+```
+
+After pulling a value from the TX FIFO that has been written, it puts out the byte on the first 8 GPIO pins and sets PIN 10 high. Setting pin 10 high indicates to the receiver that the output is now ready to read. Note there is a delay of 10 cycles on the SET PINS 1 command which will give the receiver 10 cycles to read the data (not really long enough for a real world example but enough for this simulation). Then it sets pin 10 back low for 10 cycles to ensure a gap in between outputs to ensure the receiver has time to detect this pin going low and then high again for the next output.
+
+The user program to write data looks like:
+
+```
+.config user_processor 0
+
+    DATA SET "some test data."
+    DATA WRITE 
+```
+
+This simple program uses some new instructions not previously discussed. Each user processor has a small amount of data area to hold a string (sequence of bytes). The first "DATA SET" instruction sets this data area to a given string. The second "DATA WRITE" instruction puts each byte of the string in the data area into the TX FIFO, one byte at a time. Note that this will take several cycles to complete, and many of the cycles it will be waiting for space in the TX FIFO to add another byte. So this "DATA WRITE" instruction will run concurrently with the other four parts of this example for most of the execution life of this overall example program.
+
+The PIO program to read the bytes looks like:
+
+```
+.config pio 0
+.config sm 1
+.config in_pins 0
+.config shiftctl_in 0  0 8
+
+input_loop:
+    WAIT 1, PIN 10
+    IN   PINS, 8
+    PUSH
+    WAIT 0, PIN 10
+    JMP input_loop
+```
+
+Note that it waits for PIN 10 to go high, then reads a byte from the 8 GPIO pins and pushes this byte into the RX FIFO. Then it waits for GPIO 10 to go low, which signals the end of the output, and then waits for GPIO 10 to go high again to read the next byte. It just repeats this indefinitely, pushing whatever bytes it receives into the RX FIFO.
+
+Finally, the user program to read the bytes looks like:
+
+```
+.config user_processor 1
+
+    data clear
+    data readln
+    data print
+    exit
+```
+
+The first instruction clears the data area of the second user processor, then it reads a "line" of input, which for simulation purposes is a period at the end of the input string. It then prints the line of text it received, which will appear in the status area of the Simpio UI (or the terminal console in interactive mode).
+
+The last thing this second user program does is to exit the overall program, which will end the simulation. This allows one to see the program run by just building it (PF4) and then letting it run to completion ("PF5"), which will print the string "some test data." in the status area. 
+
+One could also step through this overall program, one instruction at a time, to follow how it works in more detail, but as there are a lot of delays and waiting for things to happen, a better approach would be to set a breakpoint or two, and watch what happens in between theses. A good choice would be to set two breakpoints, one on each JMP statement, and then repeatedly pressing PF5, observing changes to the GPIO pins, FIFOs, and the output and input shift registers.
+
+
+
+MORE TBD
 
 ## Part 6 - Advanced Topics => Tips & Tricks
 

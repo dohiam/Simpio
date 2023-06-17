@@ -27,13 +27,14 @@
 #define NO_LOCATION 255
 
 typedef enum { jmp_instruction, wait_instruction, nop_instruction, in_instruction, out_instruction, push_instruction, pull_instruction, mov_instruction, set_instruction, irq_instruction, empty_instruction }instruction_e;
-typedef enum { read_instruction, write_instruction, pin_instruction, empty_user_instruction } user_instruction_e;
+typedef enum { read_instruction, write_instruction, pin_instruction, data_instruction, repeat_instruction, exit_instruction, empty_user_instruction } user_instruction_e;
 typedef enum { always, x_zero, y_zero, x_decrement, y_decrement, x_not_equal_y, pin_condition, not_osre, unset_condition } condition_e;
 typedef enum { gpio_source, pin_source, irq_source , reserved_wait_source, unset_wait_source } wait_source_e;
 typedef enum { pins_source, x_source, y_source, null_source, isr_source, osr_source, status_source, reserved_source, unset_source } source_e;
 typedef enum { pins_destination, x_destination, y_destination, reserved_destination, exec_destination, pc_destination, isr_destination, osr_destination, 
                pindirs_destination, null_destination, unset_destination } destination_e;
 typedef enum { no_operation, invert, bit_reverse, clear_operation, set_operation, wait_operation, nowait_operation,reserved_operation, unset_operation } operation_e;
+typedef enum { data_write, data_read, data_readln, data_print, data_clear, data_set, no_data_operation } data_operation_e;
 
 typedef struct {
     char    symbol[SYMBOL_MAX];
@@ -85,14 +86,20 @@ typedef struct {
 
 typedef struct {
     user_instruction_e instruction_type;
+    data_operation_e   data_operation_type;
     void *             executing_up;      /* the up executing this instruction; can't declare type because that would lead to circular header file inclusion */
     void *             executing_sm;      /* to determine which FIFO this user processor instruction should use read & write  */
+    char *             data_ptr;
+    int                data_index;
+    bool               data_indexing;
+    int                max_read_index;
     uint32_t           value;
     int8_t             pin;
     bool               set_high;
     uint8_t            delay;
     int                delay_left;
     bool               in_delay_state;
+    bool               delay_completed;
     bool               not_completed;
     uint8_t            line;
     bool               is_breakpoint;      /* true if a breakpoint has been set on this instruction */
@@ -140,12 +147,17 @@ typedef struct {
 void instruction_set_defaults(instruction_t *instr);
 void instruction_set_user_defaults(user_instruction_t* instr);
 
+// reset just the state data (so it can be executed again)
+void instruction_reset(instruction_t *instr);
+void instruction_user_reset(user_instruction_t* instr);
+
 void instruction_set_global_default();
 
 /* the following adds an instruction for the current program's target sm and pio */    
 bool instruction_add(instruction_t* instr);
 
 bool instruction_user_add(user_instruction_t* instr);
+void instruction_add_data(user_instruction_t* instr, char * data);
 
 void instruction_add_define(char* s, int v, int line);
 

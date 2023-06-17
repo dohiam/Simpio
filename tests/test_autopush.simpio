@@ -1,5 +1,5 @@
 ;!
-;  @file /test_autopush.pio
+;  @file /test_autopush.simpio
 ;  @brief Basic test of the autopush feature
 ;  @details
 ;  Inputs up to the push threshold so that an auto-push is performed. 

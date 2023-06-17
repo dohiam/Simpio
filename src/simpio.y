@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "constants.h"
 #include "hardware.h"
 #include "instruction.h"
 #include "execution.h"
@@ -24,7 +25,6 @@ extern int yylineno;
 extern int yylex();
 extern int line_count;
 int yyparse();
-
 
 int yydebug=1;
 
@@ -109,6 +109,7 @@ int simpio_test_build(int argc, char** argv)
 %union {
     int       ival;
     char      sval[32];  
+    char    strval[STRING_MAX];
 }
 
 %token _DEFINE _PROGRAM _ORIGEN _WRAP_TARGET _WRAP _LANG_OPT _WORD 
@@ -119,15 +120,16 @@ int simpio_test_build(int argc, char** argv)
 %token _AUTOPUSH _AUTOPULL
 %token _BANG _COLON _COLON_COLON
 
-%token _CONFIG _PIO _SM _PIN_CONDITION _SET_PINS _IN_PINS _OUT_PINS _SIDE_SET_PINS _SIDE_SET_COUNT _USER_PROCESSOR _FIFO_MERGE _CLKDIV
+%token _CONFIG _PIO _SM _PIN_CONDITION _SET_PINS _IN_PINS _OUT_PINS _SIDE_SET_PINS _SIDE_SET_COUNT _USER_PROCESSOR _FIFO_MERGE _CLKDIV _DATA_CONFIG
 %token _SHIFTCTL_OUT _SHIFTCTL_IN
 
 %token <ival> _BINARY_DIGIT _HEX_NUMBER _BINARY_NUMBER _DECIMAL_NUMBER _DELAY
-%token <sval> _SYMBOL
+%token <sval> _SYMBOL 
+%token <strval> _STRING
 
 %token _EXECCTRL_STATUS_SEL _TX_LEVEL _RX_LEVEL
 
-%token _WRITE _READ _VAR _HIGH _LOW _CONTINUE_USER
+%token _WRITE _READ _DATA _READLN _PRINT _REPEAT _EXIT _VAR _HIGH _LOW _CONTINUE_USER
 
 %type <ival> expression mulexp primary number 
 
@@ -149,7 +151,7 @@ label: _SYMBOL _COLON { PRINTD("label: %s\n", $1); instruction_add_label($1); } 
  *  directives: program, origen, side_set, opt_pindirs, wrap, lang_opt, and word
  ****************************************************************************************************************/
  
-directive: define_directive | program_directive | origen_directive | wrap_target_directive | wrap_directive | lang_opt_directive | word_directive | config_directive;
+directive: define_directive | program_directive | origen_directive | wrap_target_directive | wrap_directive | lang_opt_directive | word_directive | config_directive | data_directive;
 
 config_directive: _CONFIG config_statement
 
@@ -166,6 +168,8 @@ config_statement: _PIO number { hardware_set_pio($2, line_count); } | _SM number
                   _USER_PROCESSOR number{hardware_set_up($2, line_count);} |
                   _FIFO_MERGE number { hardware_fifo_merge($2); } |
                   _CLKDIV number;
+
+data_directive: _DATA_CONFIG _STRING { hardware_set_data($2); }
 
 define_directive: _DEFINE _SYMBOL expression { PRINTD("%s = %d", $2, $3); instruction_add_define($2, $3, line_count); } 
 
@@ -195,7 +199,7 @@ user_instruction_continue: user_instruction_delay _CONTINUE_USER { uci.continue_
 
 user_instruction_delay:  user_instruction _DELAY {uci.delay = $2; } | user_instruction {uci.delay = 0;};
 
-user_instruction: write_instruction | read_instruction | pin_instruction;
+user_instruction: write_instruction | read_instruction | data_instruction | repeat_instruction | pin_instruction | exit_instruction;
 
 jmp_instruction: _JMP jmp_condition _SYMBOL { ci.instruction_type = jmp_instruction;  snprintf(ci.label, SYMBOL_MAX, "%s", $3); ci.location = instruction_find_label(ci.label);  
                                               if (ci.location==NO_LOCATION) {PRINTI("label %s not found (on first pass)", $3);} } 
@@ -251,6 +255,17 @@ set_instruction: _SET  destination expression { ci.instruction_type = set_instru
 write_instruction: _WRITE number { uci.delay = 0; uci.instruction_type = write_instruction; uci.value = $2; } ;
 
 read_instruction: _READ _SYMBOL { uci.delay = 0; uci.instruction_type = read_instruction; snprintf(uci.var_name, SYMBOL_MAX, "%s", $2); } ;
+
+data_instruction: _DATA _WRITE  { uci.delay = 0; uci.instruction_type = data_instruction; uci.data_operation_type = data_write; } |
+                  _DATA _READ   { uci.delay = 0; uci.instruction_type = data_instruction; uci.data_operation_type = data_read; } |
+                  _DATA _READLN { uci.delay = 0; uci.instruction_type = data_instruction; uci.data_operation_type = data_readln; } |
+                  _DATA _PRINT  { uci.delay = 0; uci.instruction_type = data_instruction; uci.data_operation_type = data_print; } |
+                  _DATA _CLEAR  { uci.delay = 0; uci.instruction_type = data_instruction; uci.data_operation_type = data_clear; } |
+                  _DATA _SET  _STRING  { uci.delay = 0; uci.instruction_type = data_instruction; uci.data_operation_type = data_set; instruction_add_data(&uci, $3); } ;
+
+repeat_instruction: _REPEAT { uci.delay = 0; uci.instruction_type = repeat_instruction; } ;
+
+exit_instruction: _EXIT { uci.delay = 0; uci.instruction_type = exit_instruction; } ;
 
 pin_instruction: _PIN number _HIGH { uci.delay = 0; uci.instruction_type = pin_instruction; uci.pin = $2; uci.set_high = true; } |
                  _PIN number _LOW  { uci.delay = 0; uci.instruction_type = pin_instruction; uci.pin = $2; uci.set_high = false; } ;

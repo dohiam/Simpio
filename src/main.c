@@ -147,7 +147,7 @@ void update_regs() {
             if (sm->fifo.mode != TX_ONLY) {
                 if ((hardware_changed->sms[sm_num].fifo == RX_CONTENTS) || (hardware_changed->sms[sm_num].fifo == RX_STATE)) wattron(regs_win, A_BOLD); 
                 for (i=sm->fifo.rx_top-1; i>=sm->fifo.rx_bottom; i--) {
-                    regs_msg("%02d", sm->fifo.buffer[i]);
+                    regs_msg("%02X", sm->fifo.buffer[i]);
                 }
                 wattroff(regs_win, A_BOLD);   
                 regs_msg(" ");
@@ -162,7 +162,7 @@ void update_regs() {
             if (sm->fifo.mode != RX_ONLY) {
                 if ((hardware_changed->sms[sm_num].fifo == TX_CONTENTS) || (hardware_changed->sms[sm_num].fifo == TX_STATE)) wattron(regs_win, A_BOLD); 
                 for (i=sm->fifo.tx_top-1; i>=sm->fifo.tx_bottom; i--) {
-                    regs_msg("%02d", sm->fifo.buffer[i]);
+                    regs_msg("%02X", sm->fifo.buffer[i]);
                 }
                 wattroff(regs_win, A_BOLD);   
                 regs_msg("\n");
@@ -172,7 +172,7 @@ void update_regs() {
         pio_num++;
     }
     FOR_ENUMERATION(up, user_processor_t, hardware_user_processor) {
-       regs_msg("UP %d PC: %d Delay:%d \n", up->this_num, up->pc, up->instructions[up->pc].delay_left);
+       regs_msg("UP%d PC:%d Delay:%d DATA:%s\n", up->this_num, up->pc, up->instructions[up->pc].delay_left, up->data);
     }
 }
 
@@ -562,14 +562,14 @@ int main(int argc, char** argv) {
     exit(rc);
   }
     
-  if (options.debug) set_print_level(DEBUG_PRINT_LEVEL);
-  else set_print_level(INFO_PRINT_LEVEL);
-
   if (options.ui) {
     yydebug = 0;
     set_print_ui(true);
-    if (options.inter) set_print_level(INFO_PRINT_LEVEL);
-    else set_print_level(MIN_PRINT_LEVEL);
+    if (options.debug) set_print_level(DEBUG_PRINT_LEVEL);
+    else {
+        if (options.inter) set_print_level(INFO_PRINT_LEVEL);
+        else set_print_level(MIN_PRINT_LEVEL);
+    }
     ui_run(&ui_functions);
   }
     

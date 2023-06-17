@@ -1,5 +1,5 @@
 ;!
-;  @file /test_push.pio
+;  @file /test_push.simpio
 ;  @brief Basic test of PIO PUSH instruction
 ;  @details
 ;  Test push variations: plain/block, noblock, iffull.

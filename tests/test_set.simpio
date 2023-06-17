@@ -1,5 +1,5 @@
 ;!
-;  @file /test_set.pio
+;  @file /test_set.simpio
 ;  @brief Tests the PIO SET instruction
 ;  @details
 ;  Tests the various destinations and the side set feature.

@@ -1,5 +1,5 @@
 ;!
-;  @file /test_read.pio
+;  @file /test_read.simpio
 ;  @brief Simple test of read, pin, and user variables
 ;  @details
 ;  Just sets a couple of pins, inputs the value, pushes it to the rx_fifo, and then reads it into a user var.

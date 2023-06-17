@@ -1,5 +1,5 @@
 ;!
-;  @file /test_out.pio
+;  @file /test_out.simpio
 ;  @brief Basic test of PIO OUT instruction
 ;  @details
 ;  Outputting is pulling a value from the TX FIFO and most often shifting it out to GPIO pins, perhaps 

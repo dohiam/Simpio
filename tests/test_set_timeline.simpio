@@ -1,5 +1,5 @@
 ;!
-;  @file /test_set_timeline.pio
+;  @file /test_set_timeline.simpio
 ;  @brief Test that sets up a GPIO history to test the Simpio timeline feature
 ;  @details
 ;  Creates an easily recognizable pattern on GPIO pins.

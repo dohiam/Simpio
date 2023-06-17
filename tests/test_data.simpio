@@ -1,0 +1,62 @@
+;!
+;  @file /test_data.simpio
+;  @brief Tests data operations
+;  @details
+;  Writes and reads a sequence of bytes using data operations.
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; PIO Program 1: output byte on 8 pins
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config pio 0
+.config sm 0
+.config set_pins 10 1
+.config out_pins 0 8
+.config shiftctl_out 0 0 8
+
+    SET PINS, 0
+output_loop:
+    PULL
+    OUT PINS, 8
+    SET PINS, 1 [10]
+    SET PINS, 0 [10]
+    JMP output_loop
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; First user process: write line of chars
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config user_processor 0
+
+    DATA SET "some test data."
+    DATA WRITE 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; PIO Program 2: read byte on 8 pins
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config pio 0
+.config sm 1
+.config in_pins 0
+.config shiftctl_in 0  0 8
+
+input_loop:
+    WAIT 1, PIN 10
+    IN   PINS, 8
+    PUSH
+    WAIT 0, PIN 10
+    JMP input_loop
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Second user process: read line of chars & print
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config user_processor 1
+
+    data clear
+    data readln
+    data print
+    exit

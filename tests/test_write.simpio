@@ -1,5 +1,5 @@
 ;!
-;  @file /test_write.pio
+;  @file /test_write.simpio
 ;  @brief Tests the user pseudo WRITE instruction
 ;  @details
 ;  The WRITE instruction is a user instruction that simulates a user program

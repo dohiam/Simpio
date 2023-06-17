@@ -15,10 +15,10 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "constants.h"
 #include "instruction.h"
 #include "enumerator.h"
 #include "fifo.h"
-
 
 #define NUM_PIOS 2
 // number of SMs *per PIO*
@@ -96,6 +96,7 @@ typedef struct {
     int8_t  next_instruction_location; 
     int8_t  pc; /* user program counter */
     uint8_t this_num;
+    char    data[STRING_MAX];
 } user_processor_t;
 
 typedef struct {
@@ -154,6 +155,8 @@ void hardware_set_gpio(uint8_t num, bool val);
 void hardware_set_gpio_dir(uint8_t num, bool val);
 void hardware_set_irq(uint8_t irq_num, bool value);
 void hardware_fifo_merge(fifo_mode_t mode);
+
+void hardware_set_data(char * value);
               
 void hardware_set_system_defaults();
 void hardware_reset();

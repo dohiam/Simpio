@@ -22,6 +22,7 @@
 #include "execution.h"
 #include "hardware_changed.h"
 #include "ui.h"
+#include <string.h>
 
 /***********************************************************************************************************
  * state data
@@ -31,6 +32,8 @@ int current_definition;
 int current_label;
 
 program_t cp;  /* TODO multiple simultaneous program support */
+
+static bool SIMULATION_EXITED = false;
 
 /***********************************************************************************************************
  * helpers
@@ -500,18 +503,19 @@ bool try_sm(instruction_t ** instr) {
 int exec_step_programs_next_instruction() {
     static user_instruction_t* user_instruction = NULL;
     static instruction_t* instruction = NULL;
+    static int last_line = 0;
     static bool try_user_first = true;
     static bool found_user_instruction;
     static bool found_sm_instruction;
     sm_t * sm;
     bool completed;
-    int8_t next_line;
+    
+    if (SIMULATION_EXITED) return last_line;
     
     found_user_instruction = try_user(&user_instruction);
     found_sm_instruction = try_sm(&instruction);
     
-    if (!found_user_instruction && !found_sm_instruction) 
-        return -1;
+    if (!found_user_instruction && !found_sm_instruction) return last_line;
     
     if ( (try_user_first && found_user_instruction) || (!try_user_first  && !found_sm_instruction) ) {
         // execute user instruction and get next one
@@ -522,36 +526,44 @@ int exec_step_programs_next_instruction() {
         }
         else try_user_first = false;
         completed = exec_run_user_instruction(user_instruction);
+        if (SIMULATION_EXITED) return last_line;
         user_instruction = next_user_instruction(try_user_first);  /*dont_switch user processors if in continue_state */
         found_user_instruction = try_user(&user_instruction);
         //now find the line of the next instruction that will execute next time around
         if (!try_user_first) {
-            if (found_sm_instruction) return instruction->line;
-            if (found_user_instruction) return user_instruction->line;
+            if (found_sm_instruction) last_line = instruction->line;
+            else {
+                if (found_user_instruction) last_line = user_instruction->line;
+            }
         }
         else {
-            if (found_user_instruction) return user_instruction->line;
-            if (found_sm_instruction) return instruction->line;
+            if (found_user_instruction) last_line = user_instruction->line;
+            else {
+                if (found_sm_instruction) last_line = instruction->line;
+            }
         }
-        return -1;
+        return last_line;
     }
 
     if ( (!try_user_first && found_sm_instruction) || (try_user_first  && !found_user_instruction) ) {
         // execute instruction and get next one
         PRINTD("Trying SM first: delay:%d delay_left:%d\n", instruction->delay, instruction->delay_left); 
         try_user_first = true;
-        completed = exec_run_instruction(instruction);        
+        completed = exec_run_instruction(instruction);
+        if (SIMULATION_EXITED) return last_line;
         sm = (sm_t *) instruction->executing_sm;
         sm->clock_tick++;
         instruction = next_instruction();
         found_sm_instruction = try_sm(&instruction);
-        if (found_user_instruction) return user_instruction->line;
-        if (found_sm_instruction) return instruction->line;
-        return -1;
+        if (found_user_instruction) last_line = user_instruction->line;
+        else {
+            if (found_sm_instruction) last_line = instruction->line;
+        }
+        return last_line;
     }
     
     // should never get here, but ...
-    return -1;
+    return last_line;
 }
  
 /* runs each defined program/SM in round robin fashion, one clock cycle each, until breakpoint (note will always run at least one instruction) */
@@ -562,7 +574,7 @@ int exec_run_all_programs() {
     instruction_t * next_instruction;
     user_instruction_t * next_user_instruction;
     ui_enter_run_break_mode();
-    while (!hit_breakpoint && !hit_break_key) {
+    while (!hit_breakpoint && !hit_break_key && !SIMULATION_EXITED) {
       next_line = exec_step_programs_next_instruction();
       hit_breakpoint = instruction_is_breakpoint(next_line);
       if (!hit_breakpoint) {
@@ -1197,6 +1209,84 @@ void run_side_set(instruction_t * instruction) {
  }
 
 /********************************
+ **** Data Instruction *********
+ *******************************/
+
+bool run_data_instruction(user_instruction_t * instr) {
+    bool completed = false;
+    uint32_t value;
+    sm_t * sm = (sm_t *) instr->executing_sm;
+    user_processor_t * up = (user_processor_t *) instr->executing_up;
+    switch (instr->data_operation_type) {
+        case data_write:
+            value = up->data[instr->data_index];
+            PRINTI("To write [%d]: %c\n", instr->data_index, value);
+            if (sm->fifo.tx_state != FIFO_FULL) {
+                fifo_write(&(sm->fifo), value);
+                instr->data_index = instr->data_index + 1;
+                if (instr->data_index == strlen(up->data)) completed =true;
+            }
+            break;
+        case data_read:        
+            if (sm->fifo.rx_state != FIFO_EMPTY) {
+                fifo_read(&(sm->fifo), &value);
+                up->data[instr->data_index] = value;
+                instr->data_index = instr->data_index + 1;
+                if ((instr->data_index == instr->max_read_index) || (instr->data_index == STRING_MAX) ) completed = true;
+            }
+            else PRINTI("Waiting on something in RX FIFO\n");
+            break;
+        case data_readln:
+            if (sm->fifo.rx_state != FIFO_EMPTY) {
+                fifo_read(&(sm->fifo), &value);
+                up->data[instr->data_index] = value;
+                instr->data_index = instr->data_index + 1;
+                if ((value == '.') || (instr->data_index == STRING_MAX) ) completed = true;
+            }
+            else PRINTI("Waiting on something in RX FIFO\n");
+            break;
+        case data_print:
+            PRINT("%s\n", up->data);
+            completed = true;
+            break;
+        case data_set:
+            PRINTI("setting data to %s\n", instr->data_ptr);
+            snprintf(up->data, STRING_MAX, "%s", instr->data_ptr);
+            completed = true;
+            break;
+        case data_clear:
+            up->data[0] = '\0';
+            instr->data_index = 0;
+            completed = true;
+            break;
+        default:
+            PRINT("unexpected data operation\n");
+    };
+    return completed;
+}
+
+/********************************
+ **** Repeat Instruction *********
+ *******************************/
+
+bool run_repeat_instruction(user_instruction_t * instr) {
+    user_processor_t * up = (user_processor_t *) instr->executing_up;
+    PRINTI("setting user PC to zero\n");
+    up->pc = -1;  /* increment will set it to zero */
+    return true;
+}
+
+/********************************
+ **** Exit Instruction *********
+ *******************************/
+
+bool run_exit_instruction(user_instruction_t * instr) {
+    PRINT("Program has exited. Simulation Stopped.\n");
+    SIMULATION_EXITED = true;
+    return true;
+}
+
+/********************************
  **** Empty Instruction *********
  *******************************/
 
@@ -1259,7 +1349,7 @@ bool exec_run_instruction(instruction_t * instruction) {
     }
     hardware_changed_gpio_history_update();
     if (completed) {
-        instruction->not_completed = false;
+        instruction_reset(instruction);
         sm = (sm_t *) instruction->executing_sm;
         if (instruction->instruction_type == jmp_instruction) sm->pc = instruction->jmp_pc;
         else {
@@ -1274,36 +1364,40 @@ bool exec_run_instruction(instruction_t * instruction) {
 }
 
 bool exec_run_user_instruction(user_instruction_t * instruction) {
-    bool completed;
+    bool completed = false;
     instruction_or_user_instruction_t instr;
     user_processor_t * up;
-    // process pre-delay first */
-    if ((instruction->delay > 0) && !(instruction->in_delay_state)) {
-        instruction->in_delay_state = true;
-        instruction->delay_left = instruction->delay;
-        completed = false;
-    }
-    else {
-        instruction->delay_left--;
-        if (instruction->in_delay_state && instruction->delay_left == 0) {
-            PRINTI("delay completed\n");
-            instruction->in_delay_state = false;
-        }
-        if (instruction->in_delay_state) {
-            PRINTI("pre-delay before user instruction(%d left)\n", instruction->delay_left);
-            completed = false;
+    // process any pre-delay first */
+    if ((instruction->delay > 0) && !(instruction->delay_completed)) {
+        if (!(instruction->in_delay_state)) {
+            instruction->in_delay_state = true;
+            instruction->delay_left = instruction->delay;
         }
         else {
-            switch (instruction->instruction_type) {
-                case write_instruction:       completed = run_write_instruction(instruction); break;
-                case read_instruction:        completed = run_read_instruction(instruction); break;
-                case pin_instruction:         completed = run_pin_instruction(instruction); break;
-                case empty_user_instruction:  completed = run_empty_user_instruction(instruction); break;
-            };
+            instruction->delay_left--;
+            if (instruction->in_delay_state && instruction->delay_left == 0) {
+                PRINTI("delay completed\n");
+                instruction->in_delay_state = false;
+                instruction->delay_completed = true;
+            }
+            else {
+                PRINTI("pre-delay before user instruction(%d left)\n", instruction->delay_left);
+            }
         }
     }
+    if (!(instruction->in_delay_state)) {     
+        switch (instruction->instruction_type) {
+            case write_instruction:       completed = run_write_instruction(instruction); break;
+            case read_instruction:        completed = run_read_instruction(instruction); break;
+            case data_instruction:        completed = run_data_instruction(instruction); break;
+            case pin_instruction:         completed = run_pin_instruction(instruction); break;
+            case repeat_instruction:      completed = run_repeat_instruction(instruction); break;
+            case exit_instruction:        completed = run_exit_instruction(instruction); break;
+            case empty_user_instruction:  completed = run_empty_user_instruction(instruction); break;
+        };
+    }
     if (completed) {
-        instruction->not_completed = false;
+        instruction_user_reset(instruction);
         up = (user_processor_t *) instruction->executing_up;
         up->pc++;
     }

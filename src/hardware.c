@@ -42,6 +42,11 @@ IMPLEMENT_ENUMERATOR(user_processor_t, hardware_user_processor, user_processors,
 /************************************************************************************************
   set 
  ************************************************************************************************/
+    
+void hardware_set_data(char * value) {
+    snprintf(user_processors[current_up].data, STRING_MAX, "%s", value);
+}
+
 
 void hardware_set_pio(int pio, int line) {
     if (pio < 0 || pio > 1) PRINT("Error (line %d): pio must be 0 or 1\n", line);
@@ -193,6 +198,7 @@ void hardware_reset_user_processor(int p) {
     user_processors[p].next_instruction_location = 0;
     user_processors[p].pc = -1;
     user_processors[p].this_num = p;
+    user_processors[p].data[0] = '\0';
     hardware_reset_user_processor_instruction_cache(p);
 }
 

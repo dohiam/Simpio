@@ -1,5 +1,5 @@
 ;!
-;  @file /test_in.pio
+;  @file /test_in.simpio
 ;  @brief Basic test of the PIO IN instruction
 ;  @details
 ;  Covers the different sources that can be used.

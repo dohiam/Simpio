@@ -1,5 +1,5 @@
 ;!
-;  @file /test_mov.pio
+;  @file /test_mov.simpio
 ;  @brief Basic test of the PIO MOV instruction
 ;  @details
 ;  Tests the different sources, destinations, and operations on the MOV instruction.forms of JMP (different sources and operations for the jump condition).

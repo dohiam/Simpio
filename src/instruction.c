@@ -13,6 +13,8 @@
 
   
 #include "instruction.h"
+#include "constants.h"
+#include "symbols.h"
 #include "print.h"
 #include "hardware.h"
 #include "ui.h"
@@ -98,15 +100,25 @@ bool instruction_var_undefine(char * name) {
 }
 
 bool instruction_toggle_breakpoint(uint8_t line) {
-  /* search through instructions in current pio for line, and toggle breakpoint if found, else return false because couldn't toggle breakpoint */
-  pio_t * pio = hardware_pio_set();
-  int instruction;
-  for (instruction=0; instruction<NUM_INSTRUCTIONS; instruction++) {
-    if (pio->instructions[instruction].line == line) {
-      if (pio->instructions[instruction].is_breakpoint) pio->instructions[instruction].is_breakpoint = false;
-      else pio->instructions[instruction].is_breakpoint = true;
-      return true;
-    }
+  /* search through all PIO and UP instructions for an instruction on this line */
+   int instruction;
+   FOR_ENUMERATION(pio, pio_t, hardware_pio) {
+     for (instruction=0; instruction < pio->next_instruction_location; instruction++) {
+       if (pio->instructions[instruction].line == line) {
+         if (pio->instructions[instruction].is_breakpoint) pio->instructions[instruction].is_breakpoint = false;
+         else pio->instructions[instruction].is_breakpoint = true;
+         return true;
+       }
+     }
+   }
+  FOR_ENUMERATION(up, user_processor_t, hardware_user_processor) {
+      for (instruction=0; instruction<NUM_USER_INSTRUCTIONS; instruction++) {
+        if (up->instructions[instruction].line == line) {
+          if (up->instructions[instruction].is_breakpoint) up->instructions[instruction].is_breakpoint = false;
+          else up->instructions[instruction].is_breakpoint = true;
+          return true;
+        }
+      }
   }
   return false;
 }
@@ -118,13 +130,17 @@ void instruction_label_locations_init() {
         label_locations[i].location = NO_LOCATION;
     }
 }
+
+void instruction_reset(instruction_t *instr) {
+    instr->in_delay_state = false;
+    instr->delay_left = 0;
+    instr->not_completed = false;    
+}
               
 void instruction_set_defaults(instruction_t *instr) {
     instr->instruction_type = empty_instruction;
     instr->side_set_value = -1;
-    instr->in_delay_state = false;
     instr->delay = 0;
-    instr->delay_left = 0;
     instr->condition = unset_condition;
     instr->polarity = 0;
     instr->wait_source = unset_wait_source;
@@ -140,19 +156,30 @@ void instruction_set_defaults(instruction_t *instr) {
     instr->address = -1;
     instr->is_breakpoint = false;
     instr->write_value = 0;
-    instr->not_completed = false;
     instr->jmp_pc_set = false;
+    instruction_reset(instr);
+}
+
+void instruction_user_reset(user_instruction_t* instr) {
+    instr->data_index = 0;
+    instr->data_indexing = 0;
+    instr->delay_left = -1;
+    instr->delay_completed = false;
+    instr->in_delay_state = false;
+    instr->not_completed = false;    
 }
 
 void instruction_set_user_defaults(user_instruction_t* instr) {
     instr->instruction_type = empty_user_instruction;
+    instr->data_operation_type = no_data_operation;
+    instr->data_ptr = NULL;
+    instr->max_read_index = -1;
     instr->pin = -1;
     instr->delay = 0;
-    instr->delay_left = -1;
-    instr->in_delay_state = false;
-    instr->not_completed = false;
+    instr->is_breakpoint = false;
     instr->var_name[0] = 0;
     instr->continue_user = false;
+    instruction_user_reset(instr);
 }
 
 void instruction_set_definition_defaults() {
@@ -211,6 +238,8 @@ bool instruction_user_add(user_instruction_t* instr){
     //CURRENT_USER_INSTRUCTION.pio = hardware_pio_set();
     CURRENT_USER_INSTRUCTION.line = instr->line;
     CURRENT_USER_INSTRUCTION.instruction_type = instr->instruction_type;
+    CURRENT_USER_INSTRUCTION.data_operation_type = instr->data_operation_type;
+    CURRENT_USER_INSTRUCTION.data_ptr = instr->data_ptr;
     CURRENT_USER_INSTRUCTION.value = instr->value;
     CURRENT_USER_INSTRUCTION.pin = instr->pin;
     CURRENT_USER_INSTRUCTION.set_high = instr->set_high;
@@ -224,7 +253,13 @@ bool instruction_user_add(user_instruction_t* instr){
     CURRENT_INSTRUCTION.address = hardware_user_processor_set()->next_instruction_location;
     hardware_user_processor_set()->next_instruction_location++;
     return true;
-}                                     
+}                         
+
+void instruction_add_data(user_instruction_t* instr, char * data) {
+    char numstr[5];
+    snprintf(numstr, 5, "%d", instr->line);
+    instr->data_ptr = symbols_new(numstr, data, DATA_TYPE);
+}
 
 void instruction_add_define(char* s, int v, int line) {
     snprintf(definitions[current_definition].symbol, SYMBOL_MAX, "%s", s);
@@ -262,7 +297,7 @@ int instruction_fix_forward_labels() {
        }
      }
    }
-   status_msg("fixed %d forward references\n", fixed);
+   PRINTI("fixed %d forward references\n", fixed);
    return 0;
 }
 

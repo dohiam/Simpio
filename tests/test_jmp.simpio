@@ -1,5 +1,5 @@
 ;!
-;  @file /test_jmp.pio
+;  @file /test_jmp.simpio
 ;  @brief Basic test of the PIO JMP instruction
 ;  @details
 ;  Tests the different forms of JMP (different sources and operations for the jump condition).

@@ -21,12 +21,15 @@ LIB =  -l:libncursesw.a -l:libtinfo.a
 #LIB =  -lncurses -ll  -lgcov
 
  
-simpio: main.o execution.o instruction.o hardware.o fifo.o hardware_changed.o editor.o ui.o print.o parser.o lexer.o 
-	${LD} main.o execution.o instruction.o hardware.o fifo.o hardware_changed.o editor.o ui.o print.o parser.o lexer.o -o simpio ${LIB} 
+simpio: main.o execution.o instruction.o hardware.o fifo.o hardware_changed.o editor.o ui.o print.o parser.o lexer.o symbols.o
+	${LD} main.o execution.o instruction.o hardware.o fifo.o hardware_changed.o editor.o ui.o print.o parser.o lexer.o -o simpio symbols.o ${LIB} 
 	cp simpio ../tests/simpio
     
 fifo_test: ${SRC}/fifo_test.c ${INC}/fifo.h fifo.o
 	${CC} ${SRC}/fifo_test.c fifo.o -o fifo_test
+
+symbols.o: ${SRC}/symbols.c ${INC}/symbols.h
+	${CC} -c ${SRC}/symbols.c -o symbols.o
 
 main.o: ${SRC}/main.c ${HEADERS}
 	${CC} -c ${SRC}/main.c -o main.o
