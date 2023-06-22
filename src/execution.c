@@ -42,21 +42,33 @@ static bool SIMULATION_EXITED = false;
 #define THIS_INSTRUCTION &(hardware_pio_set()->instructions[sm->pc])
 #define THIS_SM hardware_sm_set()
 #define INCREMENT_PC hardware_sm_set()->pc++
-#define SHIFT_RIGHT(dir) dir
+#define SHIFT_TO_THE_RIGHT(dir) dir
 
-//get the i'th bit from a 32 bit value, starting at the LSB
-bool ith_bit(uint8_t i, uint32_t from) {
-    uint32_t bit_mask = ((uint32_t) 1) << i;
+//get the n'th bit from a 32 bit value, starting at the LSB
+bool nth_bit(uint8_t n, uint32_t from) {
+    uint32_t bit_mask = ((uint32_t) 1) << n;
     uint32_t selected_bit = from & bit_mask;
-    selected_bit = selected_bit >> i;
+    selected_bit = selected_bit >> n;
     if (selected_bit) return true;
     else return false;
+}
+
+//set the n'th bit to a given value
+bool set_nth_bit_to(uint8_t n, uint32_t * destination, bool value) {
+    uint32_t mask = ((uint32_t) 1) << n;
+    if (value) {
+        *destination = *destination | mask;
+    }
+    else {
+        mask = ~mask;
+        *destination = *destination & mask;
+    }
 }
 
 //shift one bit into the target in the desired direction
 void shift_into(bool direction, uint32_t * target, bool bit) {
     uint32_t masked;
-    if (SHIFT_RIGHT(direction)) {
+    if (SHIFT_TO_THE_RIGHT(direction)) {
         masked = bit << 31;
         *target = (*target >> 1) + masked;
     }
@@ -66,10 +78,62 @@ void shift_into(bool direction, uint32_t * target, bool bit) {
     }
 }
 
+//copy n bits from source to (always) lower n bits of destination, and then shift source n bits
+uint32_t copy_n_then_shift(bool direction, uint32_t * source, uint8_t n) {
+    uint32_t nbits;
+    uint32_t mask;
+    if (SHIFT_TO_THE_RIGHT(direction)) {
+        //copy the lower n bits and then shift them out
+        if (n==32) {
+            nbits = *source;
+            *source = 0;
+        }
+        else {
+            mask = 0xFFFFFFFF << n;
+            mask = ~mask;
+            nbits = *source & mask;
+        }
+        *source = *source >> n;
+    }
+    else {
+        // copy the upper n bits and then shift them out
+        if (n==32) {
+            nbits = *source;
+            *source = 0;
+        }
+        else {
+            nbits = *source >> (32-n);
+            *source = *source << n;
+        }
+    }
+    return nbits;
+}
+
+//shift destination n bits to make room, then copy (always) the lower n bits of the source
+void shift_n_then_copy(bool direction, uint32_t source, uint32_t * destination, uint8_t n) {
+    uint32_t mask;
+    uint32_t nbits;
+    if (n==32) nbits = source;
+    else {
+        mask = 0xFFFFFFFF << n;
+        mask = ~mask;
+        nbits = source & mask;
+    }
+    if (SHIFT_TO_THE_RIGHT(direction)) {
+        *destination = *destination >> n;
+        nbits = nbits << (32-n);
+        *destination = *destination + nbits;
+    }
+    else {
+        *destination = *destination << n;
+        *destination = *destination + nbits;
+    }
+}
+
 //shift one bit into the target in the desired direction
 void shift_into_16(bool direction, uint16_t * target, bool bit) {
     uint16_t masked;
-    if (SHIFT_RIGHT(direction)) {
+    if (SHIFT_TO_THE_RIGHT(direction)) {
         masked = bit << 15;
         *target = (*target >> 1) + masked;
     }
@@ -81,10 +145,10 @@ void shift_into_16(bool direction, uint16_t * target, bool bit) {
 
 // helper function for instruction decoding - gets (counting up from LSB to MSB) bits from ... to, shifted down so that the LSB of this bit range is the LSB of the returned result */
 uint16_t instruction_field(uint16_t machine_instruction, uint16_t from, uint16_t to) {
-    uint16_t i;
+    uint16_t n;
     uint16_t field = 0;
-    for (i = from; i <= to; i++) {
-        field += ith_bit(i, machine_instruction) << (i-from);   
+    for (n = from; n <= to; n++) {
+        field += nth_bit(n, machine_instruction) << (n-from);   
     }
     return field;
 }
@@ -747,11 +811,23 @@ bool run_autopush(instruction_t * instruction) {
  **** IN Instruction ************
  *******************************/
 
+/* Note regarding shift direction: "IN always uses the least significant Bit count bits of the source data. 
+ * For example, if PINCTRL_IN_BASE is set to 5, the instruction IN PINS, 3 will take the values of pins 5, 6 and 7, 
+ * and shift these into the ISR. First the ISR is shifted to the left or right to make room for the new input data, 
+ * then the input data is copied into the gap this leaves. 
+ * The bit order of the input data is not dependent on the shift direction."
+ * So, if "to the right", start at bit zero of source, shifting OSR to the right, leaving gap at bit 31, put bit zero there, 
+ * then get bit one, again shift OSR to the right, put bit one at bit 31, etc..
+ * And, if "to the left", start at bit zero of source, shifting OSR to the left, leaving gap at bit zero, put bit zero there,
+ * then get bit one, again shift OSR to the left, put bit one at bit zero, etc.
+ */
+
 bool run_in_instruction(instruction_t * instruction) {
     sm_t * sm = (sm_t *) instruction->executing_sm;
     bool completed, stalled;
-    int cntr, bits_todo, gpio;
-    bool bit_to_shift;
+    int n, bits_todo, gpio;
+    uint32_t nbits, mask;
+    bool bit_to_input;
     int shift_threshold = sm->shiftctl_push_thresh; 
     int shift_direction = sm->shiftctl_in_shiftdir; 
     /* if there was an autopush that stalled previously, then we couldn't complete previously so we need to resume shifting now instead of starting anew */
@@ -760,48 +836,47 @@ bool run_in_instruction(instruction_t * instruction) {
         if (instruction->source == pins_source) bits_todo = instruction->bit_count;
         else bits_todo = instruction->bit_count;
     }
+    mask = ~(0xFFFFFFFF << bits_todo);
     stalled = false;
-    PRINTI("shifting in: ");
-    for (cntr = 0; cntr < bits_todo && !stalled; cntr++) {
-        switch (instruction->source) {
-            case pins_source:
-                gpio = (sm->in_pins_base + cntr) % 32;
-                bit_to_shift = hardware_get_gpio(gpio);
-                shift_into(shift_direction, &(sm->isr), bit_to_shift);
-                break;
-            case x_source:
-                bit_to_shift = ith_bit(cntr, sm->scratch_x);
-                shift_into(shift_direction, &(sm->isr), bit_to_shift);
-                break;
-            case y_source:
-                bit_to_shift = ith_bit(cntr, sm->scratch_y);
-                shift_into(shift_direction, &(sm->isr), bit_to_shift);
-                break;
-            case null_source:
-                bit_to_shift = 0;
-                shift_into(shift_direction, &(sm->isr), bit_to_shift);
-                break;
-            case isr_source:
-                bit_to_shift = ith_bit(cntr, sm->isr);
-                shift_into(shift_direction, &(sm->isr), bit_to_shift);
-                break;
-            case osr_source:
-                bit_to_shift = ith_bit(cntr, sm->osr);
-                shift_into(shift_direction, &(sm->isr), bit_to_shift);
-                break;
-            default: PRINT("Error: invalid source for IN instruction %d, line %d\n", instruction->source, instruction->line);
-        };
-        PRINTI("%d", bit_to_shift); 
-        sm->shift_in_count++;
-        if (sm->autopush && shift_threshold > 0 && sm->shift_in_count >= shift_threshold) {
-            completed = run_autopush(instruction);
-            stalled = !completed;
-            if (stalled) sm->shift_in_resume_count = cntr; // the push stalled so we can't complete shifting and will need to resume later
-            else sm->shift_in_resume_count = 0;
-        }
-        else completed = true;
+    switch (instruction->source) {
+        case pins_source:
+            for (n = 0; n < bits_todo; n++) {
+                gpio = (sm->in_pins_base + n) % 32;
+                bit_to_input = hardware_get_gpio(gpio);
+                set_nth_bit_to(n+sm->shift_in_count, &(sm->isr), bit_to_input);
+            }
+            break;
+        case x_source:
+            shift_n_then_copy(shift_direction, sm->scratch_x, &(sm->isr), bits_todo);
+            PRINTI("shifted %08X into ISR from X\n", sm->scratch_x & mask);
+            break;
+        case y_source:
+            shift_n_then_copy(shift_direction, sm->scratch_y, &(sm->isr), bits_todo);
+            PRINTI("shifted %08X into ISR from Y\n", sm->scratch_y & mask);
+            break;
+        case null_source:
+            shift_n_then_copy(shift_direction, 0, &(sm->isr), bits_todo);
+            PRINTI("shifted %08X into ISR from null\n", 0);
+            break;
+        case isr_source:
+            shift_n_then_copy(shift_direction, sm->isr, &(sm->isr), bits_todo);
+            PRINTI("shifted %08X into ISR from ISR\n", sm->isr & mask);
+            break;
+        case osr_source:
+            shift_n_then_copy(shift_direction, sm->osr, &(sm->isr), bits_todo);
+            PRINTI("shifted %08X into ISR from OSR\n", sm->osr & mask);
+            break;
+        default: PRINT("Error: invalid source for IN instruction %d, line %d\n", instruction->source, instruction->line);
+    };
+    sm->shift_in_count = sm->shift_in_count + bits_todo;
+    if (sm->shift_in_count > 32) sm->shift_in_count = 32;
+    if ( sm->autopush && (shift_threshold > 0) && (sm->shift_in_count >= shift_threshold) ) {
+        completed = run_autopush(instruction);
+        stalled = !completed;
+        if (stalled) sm->shift_in_resume_count = bits_todo; // the push stalled so we can't complete shifting and will need to resume later
+        else sm->shift_in_resume_count = 0;
     }
-    PRINTI("\n"); 
+    else completed = true;
     return completed;
 }
 
@@ -854,12 +929,43 @@ bool run_autopull(instruction_t * instruction) {
  **** OUT Instruction ***********
  *******************************/
 
+/* From the RP2040 Data Sheet: "A 32-bit value is written to Destination: the lower Bit count bits come from the OSR, and the remainder are zeroes. 
+ * This value is the least significant Bit count bits of the OSR if SHIFTCTRL_OUT_SHIFTDIR is to the right, otherwise it is the most significant bits"
+ * Also, from experimentation with a RP Pico, when 4 bits are Output in one OUT instruction, 4 bits are *copied*, not shifted, as follows;
+ * Example 1 (to the right):  FIFO value = 0x76543210 OUT 4 to gpios 0..3:
+ *  gpio 3   gpio 2  gpio 1  gpio 0
+ *    0        0       0       0
+ *    0        0       0       1
+ *    0        0       1       0
+ *    0        0       1       1
+ *    0        1       0       0
+ *    0        1       0       1
+ *    0        1       1       0
+ *    0        1       1       1
+ * Example 2 (to the left):  FIFO value = 0x76543210 OUT to gpios 0..3:
+ *  gpio 3   gpio 2  gpio 1  gpio 0
+ *    0        1       1       1
+ *    0        1       1       0
+ *    0        1       0       1
+ *    0        1       0       0
+ *    0        0       1       1
+ *    0        0       1       0
+ *    0        0       0       1
+ *    0        0       0       0
+ * That is, each OUT execution *copies* 4 bits left-to-right from the OSR left-to-right onto the GPIOs, and then shifts the OSR 4 bits to the left.
+ * The key point is that the "left to rightness" of how each set of 4 bits are copied does not depend on whether shifting is to the right or left.
+ * Only which 4 bits from the OSR are copied depends on whether shifting is to the right or to the left.
+ * That is why it seems correct to say that the OUT X instruction "copies X bits" to the destination and then "shifts X bits", rather than simply 
+ * saying that the OUT X instruction "shifts X bits".
+ */
+
 bool run_out_instruction(instruction_t * instruction) {
     sm_t * sm = (sm_t *) instruction->executing_sm;
     bool completed, stalled;
-    uint8_t cntr, bits_todo;
+    uint8_t n, bits_todo;
     int gpio;
-    bool bit_to_shift;
+    bool bit_to_output;
+    uint32_t nbits;
     int shift_threshold = sm->shiftctl_pull_thresh; 
     int shift_direction = sm->shiftctl_out_shiftdir; 
     /* if there was an autopull that stalled previously, then we couldn't complete previously so we need to resume shifting now instead of starting anew */
@@ -870,53 +976,54 @@ bool run_out_instruction(instruction_t * instruction) {
     }
     if ( (shift_threshold > 0 && sm->shift_out_count >= shift_threshold) || (sm->shift_out_count >= 32) ) stalled = true;
     else stalled = false;
-    for (cntr = 0; cntr < bits_todo && !stalled; cntr++) {
-        if (SHIFT_RIGHT(shift_direction)) bit_to_shift = ith_bit(sm->shift_out_count, sm->osr);
-        else bit_to_shift = ith_bit(shift_threshold - sm->shift_out_count - 1, sm->osr);
-        switch (instruction->destination) {
-            case pins_destination:
-                gpio = (sm->out_pins_base + sm->shift_out_count) % 32;
-                hardware_set_gpio(gpio , bit_to_shift);
-                PRINTI("shifted out: %d to gpio:%d\n", bit_to_shift, gpio);
-                break;
-            case x_destination:
-                shift_into(shift_direction, &(sm->scratch_x), bit_to_shift);
-                PRINTI("shifted out: %d to x:%X\n", bit_to_shift, sm->scratch_x);
-                break;
-            case y_destination:
-                shift_into(shift_direction, &(sm->scratch_y), bit_to_shift);
-                PRINTI("shifted out: %d to y:%X\n", bit_to_shift, sm->scratch_y);
-                break;
-            case null_destination:
-                sm->shift_out_count++;  /* discarding what would be shifted */
-                PRINTI("shifting out to null\n");
-                break;
-            case pindirs_destination:
-                // write this bit onto the gpios using the right direction, updating the count
-                gpio = (sm->in_pins_base + bits_todo - cntr) % 32;
-                if (shift_direction)  hardware_set_gpio_dir(gpio, bit_to_shift);
-                else hardware_set_gpio_dir(gpio, bit_to_shift);
-                PRINTI("shifted out: %d to gpio direction:%d\n", bit_to_shift, gpio);
-                break;
-            case pc_destination:
-                shift_into(shift_direction, &(sm->pc_temp), bit_to_shift);
-                PRINTI("shifted out: %d to PC:%d\n", bit_to_shift, sm->pc_temp);
-                break;
-            case isr_destination:
-                shift_into(shift_direction, &(sm->isr), bit_to_shift);
-                PRINTI("shifted out: %d to y:%X\n", bit_to_shift, sm->isr);
-                sm->shift_in_count = cntr;
-                break;
-            case exec_destination:
-                shift_into_16(shift_direction, &(sm->exec_machine_instruction), bit_to_shift);
-                PRINTI("shifted out: %d to y:%X\n", bit_to_shift, sm->exec_machine_instruction);
-                break;
-            default: PRINT("Error: invalid source for IN instruction %d, line %d\n", instruction->source, instruction->line);
-        };
-        sm->shift_out_count++;
-        if ( (shift_threshold > 0 && sm->shift_out_count >= shift_threshold) || (sm->shift_out_count >= 32) ) stalled = true;
-        else stalled = false;
-    }
+    nbits = copy_n_then_shift(shift_direction, &(sm->osr), bits_todo);
+    PRINT("nbits=%08X\n", nbits);
+    switch (instruction->destination) {
+        case pins_destination:
+            for (n = 0; n < bits_todo; n++) {
+                bit_to_output = nth_bit(n, nbits);
+                gpio = (sm->out_pins_base + n) % 32;
+                hardware_set_gpio(gpio , bit_to_output);
+                PRINTI("set gpio %d to %d\n", gpio, bit_to_output);
+            }
+            break;
+        case x_destination:
+            sm->scratch_x = nbits;
+            PRINTI("copied %08X to X\n", nbits);
+            break;
+        case y_destination:
+            sm->scratch_y = nbits;
+            PRINTI("copied %08X to Y\n", nbits);
+            break;
+        case null_destination:
+            PRINTI("discarded %08X (sent to null)\n", nbits);
+            break;
+        case pindirs_destination:
+            for (n = 0; n < bits_todo; n++) {
+                bit_to_output = nth_bit(n, nbits);
+                gpio = (sm->out_pins_base + n) % 32;
+                hardware_set_gpio_dir(gpio , bit_to_output);
+                PRINTI("set gpio %d to direction %d\n", gpio, bit_to_output);
+            }
+            break;
+        case pc_destination:
+            sm->pc_temp = nbits;
+            PRINTI("copied %08X to PC\n", nbits);
+            break;
+        case isr_destination:
+            sm->isr = nbits;
+            PRINTI("copied %08X to ISR\n", nbits);
+            break;
+        case exec_destination:
+            sm->exec_machine_instruction = nbits;
+            PRINTI("copied %08X to EXEC\n", nbits);
+            break;
+        default: PRINT("Error: invalid source for IN instruction %d, line %d\n", instruction->source, instruction->line);
+    };
+    sm->shift_out_count = sm->shift_out_count + bits_todo;
+    if (sm->shift_out_count > 32) sm->shift_out_count = 32;
+    if ( (shift_threshold > 0) && (sm->shift_out_count >= shift_threshold) ) stalled = true;
+    else stalled = false;
     //if need to autopull
     if (sm->autopull && stalled)  {
         PRINTI("Performing Auto Pull\n");

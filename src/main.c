@@ -65,7 +65,7 @@ void update_regs() {
     regs_msg("  0 1 2 3 4 5 6 7 8 9       0 1 2 3 4 5 6 7 8 9");
     var = user_variable_first(&var_e);
     if (var && (var->name[0] != 0) ) {
-      if (var->has_value) { regs_msg("   %s=%d\n", var->name, var->value); }
+      if (var->has_value) { regs_msg("   %s=%08X\n", var->name, var->value); }
       else regs_msg("   %s=___\n", var->name);
     }
     else regs_msg("\n");
@@ -89,9 +89,7 @@ void update_regs() {
                wattroff(regs_win, A_BOLD);      
             }
             if (var && (var->name[0] != 0) ) { 
-              status_msg(var->name);
-              status_msg("\n");
-              if (var->has_value) { regs_msg("%s=%d", var->name, var->value); }
+              if (var->has_value) { regs_msg("%s=%08X", var->name, var->value); }
               else regs_msg("  %s=___", var->name);
               var = user_variable_next(&var_e);
             }

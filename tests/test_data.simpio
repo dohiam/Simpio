@@ -15,7 +15,7 @@
 .config sm 0
 .config set_pins 10 1
 .config out_pins 0 8
-.config shiftctl_out 0 0 8
+.config shiftctl_out 1 0 8
 
     SET PINS, 0
 output_loop:
@@ -41,7 +41,7 @@ output_loop:
 .config pio 0
 .config sm 1
 .config in_pins 0
-.config shiftctl_in 0  0 8
+.config shiftctl_in 0 0 8
 
 input_loop:
     WAIT 1, PIN 10

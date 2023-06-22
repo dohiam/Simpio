@@ -138,7 +138,7 @@ PUBLIC                   { return _PUBLIC; }
 [0-1]                    { yylval.ival = strtol(yytext, NULL, 10); return _BINARY_DIGIT; }
 [0-9]+                   { yylval.ival = strtol(yytext, NULL, 10); return _DECIMAL_NUMBER; }
 
-[A-Za-z][0-9A-Za-z_]*    { PRINTD("Symbol:'%s'",yytext); snprintf(yylval.sval, SYMBOL_MAX, "%s", yytext); return _SYMBOL; }
+[A-Za-z][0-9A-Za-z_]*    { PRINTD("Symbol:'%s'\n",yytext); snprintf(yylval.sval, SYMBOL_MAX, "%s", yytext); return _SYMBOL; }
 
 \"([^\\\"]|\\.)*\"       { PRINTD("Quoted String:'%s'",yytext); snprintf(yylval.strval, SYMBOL_MAX, "%s", &(yytext[1])); yylval.strval[yyleng-2]='\0'; return _STRING;}
 

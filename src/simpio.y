@@ -167,6 +167,7 @@ config_statement: _PIO number { hardware_set_pio($2, line_count); } | _SM number
                   _EXECCTRL_STATUS_SEL number number {hardware_set_status_sel($2, $3); } |
                   _USER_PROCESSOR number{hardware_set_up($2, line_count);} |
                   _FIFO_MERGE number { hardware_fifo_merge($2); } |
+                  _VAR _SYMBOL { instruction_var_define($2); } |
                   _CLKDIV number;
 
 data_directive: _DATA_CONFIG _STRING { hardware_set_data($2); }
@@ -202,7 +203,7 @@ user_instruction_delay:  user_instruction _DELAY {uci.delay = $2; } | user_instr
 user_instruction: write_instruction | read_instruction | data_instruction | repeat_instruction | pin_instruction | exit_instruction;
 
 jmp_instruction: _JMP jmp_condition _SYMBOL { ci.instruction_type = jmp_instruction;  snprintf(ci.label, SYMBOL_MAX, "%s", $3); ci.location = instruction_find_label(ci.label);  
-                                              if (ci.location==NO_LOCATION) {PRINTI("label %s not found (on first pass)", $3);} } 
+                                              if (ci.location==NO_LOCATION) {PRINTI("Note: label %s not found (on first pass)", $3);} } 
 
 jmp_condition:  /* empty */ { ci.condition = always; } | _NOT_X { ci.condition = x_zero; } | _NOT_Y { ci.condition = y_zero; } | _X_DECREMENT { ci.condition = x_decrement; } | 
                 _Y_DECREMENT { ci.condition = y_decrement; } | _X_NOT_EQUAL_Y { ci.condition = x_not_equal_y; } | _PIN { ci.condition = pin_condition; } | _NOT_OSRE { ci.condition = not_osre; } ;

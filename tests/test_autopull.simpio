@@ -12,7 +12,7 @@
 .config sm 0
 .config user_processor 0
 .config out_pins 0 2
-.config shiftctl_out_shiftdir 0 1 2   ;  shiftdir=0, autopull, threshold 2
+.config shiftctl_out 1 1 2   ;  shiftdir=0, autopull, threshold 2
 
     WRITE 1 [->]
     WRITE 2 [->]

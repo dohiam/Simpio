@@ -13,7 +13,7 @@
 .config user_processor 0
 .config user_var A
 .config in_pins 0
-.config shiftctl_in_shiftdir 0  1 2   ; shiftdir=0, autopush, threshold 2
+.config shiftctl_in 0  1 2   ; shiftdir=0, autopush, threshold 2
 
     PIN 0, HIGH [->]
     PIN 1, HIGH
@@ -21,7 +21,7 @@
     READ A
     READ A
 
-    SET X, 5
+    SET X, 6
 INPUT:
     IN PINS, 1
     JMP X-- INPUT

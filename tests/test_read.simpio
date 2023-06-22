@@ -13,7 +13,7 @@
 .config in_pins 1
 .config shiftctl_in 0 0 32        ; shift to the left, no autopush, no threshold
 .config user_processor 0
-.config user_var A
+.config user_var A 
 
     PIN 1, high [->] 
     PIN 2, high
