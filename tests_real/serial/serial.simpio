@@ -1,0 +1,77 @@
+;!
+;  @file /serial.simpio
+;  @brief Simple send and receive similar to SPI
+;  @details
+;  Writes and reads a sequence of bytes using data operations.
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; PIO Program 1: output byte on 8 pins
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.program sender
+.config pio 0
+.config sm 0
+.config set_pins 25 1
+.config out_pins 22 1
+.config shiftctl_out 1 1 32
+
+    SET PINS, 0
+output_loop:
+    OUT PINS, 1
+    SET PINS, 1 [30]
+    SET PINS, 0 [30]
+    JMP output_loop
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; First user process: write line of chars
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config user_processor 0
+.config serial usb
+
+    WRITE 0x00000001
+    WRITE 0x10000000
+    WRITE 0X00001111
+    WRITE 0X11110000
+    WRITE 0xFFFFFFFF
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; PIO Program 2: read byte on 8 pins
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.program receiver
+.config pio 0
+.config sm 1
+.config in_pins 22
+.config shiftctl_in 1 1 32
+
+    WAIT    0 GPIO 25
+input:
+    WAIT    1 GPIO 25
+    IN      PINS, 1
+    WAIT    0 GPIO 25
+    JMP     input
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Second user process: read line of chars & print
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config user_processor 1
+.config user_var A 
+
+    READ A
+    PRINT A
+    READ A
+    PRINT A
+    READ A
+    PRINT A
+    READ A
+    PRINT A
+    READ A
+    PRINT A
+    
+    exit
