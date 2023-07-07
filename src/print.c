@@ -282,7 +282,43 @@ static void printf_user_instruction(user_instruction_t* instr) {
             if (instr->set_high) printf("=> HIGH; ");
             else printf("=> LOW; ");
             break;
-        case empty_instruction: printf("instruction: no instruction! "); break;
+        case user_print_instruction: 
+            printf("print %s ", instr->var_name);
+            break;
+        case data_instruction: 
+            switch (instr->data_operation_type) {
+                case data_write:
+                    printf("data read ");
+                    break;
+                case data_read:
+                    printf("data read ");
+                    break;
+                case data_readln:
+                    printf("data readln ");
+                    break;
+                case data_print:
+                    printf("data print ");
+                    break;
+                case data_clear:
+                    printf("data clear ");
+                    break;
+                case data_set:
+                    printf("data set ");
+                    break;
+                case no_data_operation:
+                    printf("data but no operation? ");
+                    break;
+                };
+                break;
+            case repeat_instruction:
+                printf("repeat ");
+                break;
+            case exit_instruction:
+                printf("exit ");
+                break;
+        case empty_instruction: 
+                printf("instruction: no instruction! "); 
+                break;
     };
     printf_delay(instr->delay);
     printf_address(instr->address);
@@ -329,7 +365,9 @@ void printf_hardware_configuration() {
         FOR_ENUMERATION(sm, sm_t, hardware_sm) {
             if (sm->pio_num == pio->this_num) {
                 printf("      sm: %d\n", sm->this_num);
+                printf("         program name: %s\n", sm->program_name);
                 printf("         pc: %d\n", sm->pc);
+                printf("         first pc: %d\n", sm->first_pc);
                 printf("         in   pins base: %d\n", sm->in_pins_base);
                 printf("         out  pins base: %d  num_pins: %d\n", sm->out_pins_base, sm->out_pins_num);
                 printf("         set  pins base: %d  num_pins: %d\n", sm->set_pins_base, sm->set_pins_num);

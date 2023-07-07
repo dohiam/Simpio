@@ -103,6 +103,9 @@ rx_level                 { return _RX_LEVEL; }
 user_processor           { return _USER_PROCESSOR; }
 fifo_merge               { return _FIFO_MERGE; }
 clkdiv                   { return _CLKDIV; }
+serial                   { return _SERIAL; }
+rs232                    { return _RS232; }
+usb                      { return _USB; }
 
 
 jmp                      { return _JMP; }

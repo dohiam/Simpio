@@ -27,7 +27,7 @@
 #define NO_LOCATION 255
 
 typedef enum { jmp_instruction, wait_instruction, nop_instruction, in_instruction, out_instruction, push_instruction, pull_instruction, mov_instruction, set_instruction, irq_instruction, empty_instruction }instruction_e;
-typedef enum { read_instruction, write_instruction, pin_instruction, data_instruction, repeat_instruction, exit_instruction, empty_user_instruction } user_instruction_e;
+typedef enum { read_instruction, write_instruction, user_print_instruction, pin_instruction, data_instruction, repeat_instruction, exit_instruction, empty_user_instruction } user_instruction_e;
 typedef enum { always, x_zero, y_zero, x_decrement, y_decrement, x_not_equal_y, pin_condition, not_osre, unset_condition } condition_e;
 typedef enum { gpio_source, pin_source, irq_source , reserved_wait_source, unset_wait_source } wait_source_e;
 typedef enum { pins_source, x_source, y_source, null_source, isr_source, osr_source, status_source, reserved_source, unset_source } source_e;

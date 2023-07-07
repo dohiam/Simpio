@@ -82,7 +82,7 @@ bool fifo_write(fifo_t * f, uint32_t value) {
        f->buffer[f->tx_bottom] = value;
    }
    set_status(f);
-   PRINTI("writing %d, now in fifo: %d\n", value, f->tx_top - f->tx_bottom);    
+   PRINTI("writing %08X, now in fifo: %d\n", value, f->tx_top - f->tx_bottom);    
    return true;
 }
 
@@ -100,7 +100,7 @@ bool fifo_read(fifo_t * f, uint32_t * value_ptr) {
    if (f->rx_top == 0) f->rx_state = FIFO_EMPTY;
    else f->rx_state = FIFO_HAS_DATA;
    set_status(f);
-   PRINTI("reading %d, left in fifo: %d\n", *value_ptr, f->rx_top - f->rx_bottom);    
+   PRINTI("reading %08X, left in fifo: %d\n", *value_ptr, f->rx_top - f->rx_bottom);    
    return true;
 }
 
@@ -122,7 +122,7 @@ bool fifo_push(fifo_t * f, uint32_t value) {
        f->buffer[f->rx_bottom] = value;
    }
    set_status(f);
-   PRINTI("pushed %d, now in fifo: %d\n", value, f->rx_top - f->rx_bottom);    
+   PRINTI("pushed %08X, now in fifo: %d\n", value, f->rx_top - f->rx_bottom);    
    return true;
 }
 

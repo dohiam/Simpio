@@ -239,7 +239,10 @@ void ed_goto_line(editor_t *ed, int line_num) {
     /* scroll to line_num */
     ed->first_displayed_line = line_num;
     ed->last_displayed_line = ed->first_displayed_line + ed->window_num_rows - 1;
-    if (ed->last_displayed_line >= ed->num_lines) ed->last_displayed_line = ed->num_lines;
+    if (ed->last_displayed_line >= ed->num_lines) {
+        ed->last_displayed_line = ed->num_lines;
+        ed->first_displayed_line = ed->num_lines - ed->window_num_rows + 1;
+    }
   }
   ed->cursor_y = line_num - ed->first_displayed_line;
   ed->cursor_x = 0;

@@ -46,7 +46,7 @@ int yywrap()
 void system_init() {
     line_count = 0;
     instruction_set_defaults(&ci);
-    hardware_set_system_defaults();  /* support multiple simultaneous pios and sms */
+    hardware_set_system_defaults();  
 }
 
 int simpio_parse(char * pio_file_name)
@@ -120,7 +120,7 @@ int simpio_test_build(int argc, char** argv)
 %token _AUTOPUSH _AUTOPULL
 %token _BANG _COLON _COLON_COLON
 
-%token _CONFIG _PIO _SM _PIN_CONDITION _SET_PINS _IN_PINS _OUT_PINS _SIDE_SET_PINS _SIDE_SET_COUNT _USER_PROCESSOR _FIFO_MERGE _CLKDIV _DATA_CONFIG
+%token _CONFIG _PIO _SM _PIN_CONDITION _SET_PINS _IN_PINS _OUT_PINS _SIDE_SET_PINS _SIDE_SET_COUNT _USER_PROCESSOR _FIFO_MERGE _CLKDIV _DATA_CONFIG _SERIAL _USB _RS232
 %token _SHIFTCTL_OUT _SHIFTCTL_IN
 
 %token <ival> _BINARY_DIGIT _HEX_NUMBER _BINARY_NUMBER _DECIMAL_NUMBER _DELAY
@@ -168,6 +168,7 @@ config_statement: _PIO number { hardware_set_pio($2, line_count); } | _SM number
                   _USER_PROCESSOR number{hardware_set_up($2, line_count);} |
                   _FIFO_MERGE number { hardware_fifo_merge($2); } |
                   _VAR _SYMBOL { instruction_var_define($2); } |
+                  _SERIAL _RS232 | _SERIAL _USB |
                   _CLKDIV number;
 
 data_directive: _DATA_CONFIG _STRING { hardware_set_data($2); }
@@ -200,7 +201,7 @@ user_instruction_continue: user_instruction_delay _CONTINUE_USER { uci.continue_
 
 user_instruction_delay:  user_instruction _DELAY {uci.delay = $2; } | user_instruction {uci.delay = 0;};
 
-user_instruction: write_instruction | read_instruction | data_instruction | repeat_instruction | pin_instruction | exit_instruction;
+user_instruction: write_instruction | read_instruction | data_instruction | print_instruction | repeat_instruction | pin_instruction | exit_instruction;
 
 jmp_instruction: _JMP jmp_condition _SYMBOL { ci.instruction_type = jmp_instruction;  snprintf(ci.label, SYMBOL_MAX, "%s", $3); ci.location = instruction_find_label(ci.label);  
                                               if (ci.location==NO_LOCATION) {PRINTI("Note: label %s not found (on first pass)", $3);} } 
@@ -256,6 +257,8 @@ set_instruction: _SET  destination expression { ci.instruction_type = set_instru
 write_instruction: _WRITE number { uci.delay = 0; uci.instruction_type = write_instruction; uci.value = $2; } ;
 
 read_instruction: _READ _SYMBOL { uci.delay = 0; uci.instruction_type = read_instruction; snprintf(uci.var_name, SYMBOL_MAX, "%s", $2); } ;
+
+print_instruction: _PRINT _SYMBOL { uci.delay = 0; uci.instruction_type = user_print_instruction; snprintf(uci.var_name, SYMBOL_MAX, "%s", $2); } ;
 
 data_instruction: _DATA _WRITE  { uci.delay = 0; uci.instruction_type = data_instruction; uci.data_operation_type = data_write; } |
                   _DATA _READ   { uci.delay = 0; uci.instruction_type = data_instruction; uci.data_operation_type = data_read; } |

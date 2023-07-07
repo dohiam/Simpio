@@ -58,6 +58,7 @@ SM:3 CLOCK: XXX      X:12345678   Y:12345678
 void update_regs() {
     char status_char;
     int pio_num, sm_num, up_num, gpio_num, row, col, col_max, i, pad;
+    uint32_t temp;
     hardware_changed_t * hardware_changed = hardware_get_changed();
     user_variable_t * var; user_variable_enumerator_t var_e;
     regs_window_reset();
@@ -129,10 +130,14 @@ void update_regs() {
             print_with_change(scratch_y,"Y:%08X ") 
             print_with_change(exec_machine_instruction,"EXEC:%08X \n") 
             regs_msg("PC:%02d",sm->pc);
+            if (sm->osr_empty) wattron(regs_win, A_BOLD);
             regs_msg(" OSR");
+            wattroff(regs_win, A_BOLD);      
             print_with_change(shift_out_count,"-%02d") 
             print_with_change(osr,":%08X") 
+            if (sm->isr_full) wattron(regs_win, A_BOLD);
             regs_msg(" ISR");
+            wattroff(regs_win, A_BOLD);      
             print_with_change(shift_in_count,"-%02d") 
             print_with_change(isr,":%08X") 
             regs_msg(" RX");
@@ -145,7 +150,8 @@ void update_regs() {
             if (sm->fifo.mode != TX_ONLY) {
                 if ((hardware_changed->sms[sm_num].fifo == RX_CONTENTS) || (hardware_changed->sms[sm_num].fifo == RX_STATE)) wattron(regs_win, A_BOLD); 
                 for (i=sm->fifo.rx_top-1; i>=sm->fifo.rx_bottom; i--) {
-                    regs_msg("%02X", sm->fifo.buffer[i]);
+                    temp = sm->fifo.buffer[i] && 0XFF;
+                    regs_msg("%02X", temp);
                 }
                 wattroff(regs_win, A_BOLD);   
                 regs_msg(" ");
@@ -160,7 +166,8 @@ void update_regs() {
             if (sm->fifo.mode != RX_ONLY) {
                 if ((hardware_changed->sms[sm_num].fifo == TX_CONTENTS) || (hardware_changed->sms[sm_num].fifo == TX_STATE)) wattron(regs_win, A_BOLD); 
                 for (i=sm->fifo.tx_top-1; i>=sm->fifo.tx_bottom; i--) {
-                    regs_msg("%02X", sm->fifo.buffer[i]);
+                    temp = sm->fifo.buffer[i] && 0XFF;
+                    regs_msg("%02X", temp);
                 }
                 wattroff(regs_win, A_BOLD);   
                 regs_msg("\n");
@@ -345,7 +352,25 @@ void show_timeline() {
     ui_show_timeline_window(&timeline_display_data);
 }
 
-ui_user_functions_t ui_functions = {&buildit, &stepit, &toggleit, &runit, &saveit, &get_timeline_parameters, &show_timeline, NULL};  // filename filled in later
+void show_fifos() {
+    char ch;
+    int i;
+    ui_temp_window_write("type q to exit\n\n");
+    FOR_ENUMERATION(sm, sm_t, hardware_sm) {
+       ui_temp_window_write("pio: %d sm; %d \n", sm->pio_num, sm->this_num);
+       ui_temp_window_write("    TX:\n");
+       for (i=sm->fifo.tx_top-1; i>=sm->fifo.tx_bottom; i--) {
+           ui_temp_window_write("      %08X\n", sm->fifo.buffer[i]);
+       }
+       ui_temp_window_write("    RX:\n");
+       for (i=sm->fifo.rx_top-1; i>=sm->fifo.rx_bottom; i--) {
+         ui_temp_window_write("      %08X\n", sm->fifo.buffer[i]);
+       }
+    }
+    while ( (ch = ui_temp_window_getch()) != 'q' ) ui_temp_window_write("try again; q to exit\n");
+}
+
+ui_user_functions_t ui_functions = {&buildit, &stepit, &toggleit, &runit, &saveit, &get_timeline_parameters, &show_timeline, &show_fifos, NULL};  // filename filled in later
 
 int main_test(int argc, char** argv) {
   instruction_or_user_instruction_t instr;

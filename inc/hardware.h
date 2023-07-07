@@ -51,6 +51,7 @@ typedef struct {
     uint32_t osr;                       /* output shift register */
     uint32_t isr;                       /* input shift register */
     /* SM configuration */
+    int32_t  first_pc;                  /* first_instruction to execute when reset */
     uint8_t  pin_condition;             /* gpio selected for pin condition (must be 0..31) */
     uint8_t  set_pins_base;             /* base gpio for set operations */
     uint8_t  set_pins_num;              /* number of gpios to set for set operations, starting at base */
@@ -81,6 +82,8 @@ typedef struct {
     void  *  pio;                       /* pointer up to the pio that this sm is part of */
     uint8_t  pio_num;
     uint8_t  this_num;
+    bool     osr_empty;
+    bool     isr_full;
 } sm_t;
 
 /* There are two pios, each with 2 irqs, 4 state machines, and instruction memory that is not currently modeled */

@@ -27,6 +27,8 @@ static int current_pio = -1;
 static int current_sm = -1;
 static int current_up = -1;
 
+static char current_program_name[SYMBOL_MAX];
+
 /* enumerators */
 
 IMPLEMENT_ENUMERATOR(pio_t, hardware_pio, pios, NUM_PIOS)
@@ -55,7 +57,9 @@ void hardware_set_pio(int pio, int line) {
 
 void hardware_set_sm(int sm, int line) {
     if (sm < 0 || sm > 3) PRINT("Error (line %d): sm must be 0..3\n", line);
-    current_sm = sm;
+    if (current_pio < 0) current_sm = sm;
+    else current_sm = current_pio * 4 + sm;
+    if (current_program_name) snprintf(CURRENT_SM.program_name, SYMBOL_MAX, "%s", current_program_name);
 }
 
 void hardware_set_up(uint8_t pnum, int line) {
@@ -136,6 +140,8 @@ void hardware_set_pios_defaults() {
 }
 
 void hardware_set_sm_defaults(uint8_t sm) {
+    THIS_SM.pc = -1;
+    THIS_SM.first_pc = -1;
     THIS_SM.pin_condition = -1; /* no pin condition set */
     THIS_SM.set_pins_base = 0;
     THIS_SM.set_pins_num = 0;
@@ -158,7 +164,7 @@ void hardware_set_sm_defaults(uint8_t sm) {
 }
 
 void hardware_reset_sm(uint8_t sm) {
-    THIS_SM.pc = -1;
+    THIS_SM.pc = THIS_SM.first_pc;
     THIS_SM.pc_temp = 0;
     THIS_SM.clock_tick = 0;
     fifo_init(&(THIS_SM.fifo), BIDI);
@@ -167,9 +173,11 @@ void hardware_reset_sm(uint8_t sm) {
     THIS_SM.osr = 0;
     THIS_SM.isr = 0;
     THIS_SM.shift_in_count = 0;
-    THIS_SM.shift_out_count = 0;
+    THIS_SM.shift_out_count = 0; 
     THIS_SM.shift_in_resume_count = 0;
     THIS_SM.shift_out_resume_count = 0;
+    THIS_SM.osr_empty = true;
+    THIS_SM.isr_full = false;
 }
 
 void hardware_reset_sms() {
@@ -238,14 +246,18 @@ bool hardware_get_gpio_dir(uint8_t num) { CHECK_GPIO_B(num) return gpios[num].pi
 void hardware_set_irq(uint8_t irq_num, bool value) {pios[current_pio].irqs[irq_num].value = value;}
 
 void hardware_set_program_name(char* name) {
-   snprintf(CURRENT_SM.program_name, SYMBOL_MAX, "%s", name); 
-   CURRENT_SM.pc = hardware_pio_set()->next_instruction_location;  /* the first executable statement after the .program directive is the first instruction to be executed by the current SM */
+   snprintf(current_program_name, SYMBOL_MAX, "%s", name); 
 }
 
 
 void hardware_init_current_sm_pc_if_needed(int8_t first_instruction_location) {
     sm_t *  current_sm = hardware_sm_set();
-    if (current_sm->pc < 0) current_sm->pc = first_instruction_location;
+    PRINTD("checking first instruction for %d\n", current_sm->this_num);
+    if (current_sm->first_pc < 0) {
+        current_sm->first_pc = current_sm->pc = first_instruction_location;
+        PRINTD("sm %d first instruction = %d\n", current_sm->this_num, first_instruction_location);
+    }
+    else {PRINTD("sm %d PC already set to %d\n", current_sm->this_num, current_sm->pc)};
 }
 
 void hardware_init_current_up_pc_if_needed(int8_t first_instruction_location) {

@@ -439,7 +439,7 @@ bool exec_run_instruction(instruction_t * instruction);
 bool exec_run_user_instruction(user_instruction_t * instruction);
 
 instruction_t* next_instruction() {
-    static sm_t  *sm;
+    static sm_t  *sm = NULL;
     static hardware_sm_enumerator_t e;
     int sm_count;
     pio_t * pio;
@@ -451,18 +451,27 @@ instruction_t* next_instruction() {
     for (sm_count = 0, found_sm_with_instructions = false; sm_count < (NUM_PIOS * NUM_SMS) && !found_sm_with_instructions; sm_count++) {
       if (!sm) {  /* this should only be true when first initialized */
         sm = hardware_sm_first(&e);
+        PRINTD("first e = %d pio= %d sm = %d\n", e, sm->pio_num, sm->this_num);
       }
       else {  /* not the first time through */
         sm = hardware_sm_next(&e);
+        if (sm) {
+            PRINTD("next e = %d pio= %d sm = %d\n", e, sm->pio_num, sm->this_num);
+            PRINTD("next sm  = %x\n", e);
+        }
         if (!sm) {
+          PRINTD("going back to first sm\n");
           sm = hardware_sm_first(&e);
+          PRINTD("first e = %d pio= %d sm = %d\n", e, sm->pio_num, sm->this_num);
         }
       }
       pio = (pio_t *) sm->pio;
+      PRINTD("instruction num = %d\n", sm->pc);
       if ( (sm->pc >= 0) && (pio->instructions[sm->pc].instruction_type != empty_instruction) ) {
           found_sm_with_instructions = true;
           found_instruction = &(pio->instructions[sm->pc]);
           found_instruction->executing_sm = (void *) sm;
+          PRINTD("instruction line num = %d\n", found_instruction->line);
       }
     }
     if (found_sm_with_instructions) {
@@ -748,7 +757,7 @@ bool run_wait_instruction(instruction_t * instruction) {
             PRINT("Error: wait statement on line %d ignored because wait source is not set\n", instruction->line);
             break;
     };
-    PRINTI("waiting done: %d\n", completed);
+    PRINTD("waiting done: %d\n", completed);
     return completed;
 }
 
@@ -767,16 +776,13 @@ bool run_nop_instruction(instruction_t * instruction) {
 
 bool run_push_instruction(instruction_t * instruction) {
     sm_t * sm = (sm_t *) instruction->executing_sm;
-    bool only_if_shifting_complete = instruction->if_full;  /* as I understand the meaning of iffull, calling only_if_shifting_complete is a better name for it and won't be confused with the FIFO full condition*/
     bool block = instruction->block;
     int  thresh = sm->shiftctl_push_thresh;
-    PRINTD("iffull:%d; block:%d, thresh:%d, count:%d\n", only_if_shifting_complete, block, thresh, sm->shift_in_count);
+    PRINTD("iffull:%d; block:%d, thresh:%d, count:%d\n", instruction->if_full, block, thresh, sm->shift_in_count);
     bool try_to_push;
-    if (only_if_shifting_complete) { 
-        if (sm->shift_in_count < thresh) {
-            PRINTI("push skipped because shifting not complete\n");
-            return true;  /* instruction completed without doing anything */
-        }
+    if (instruction->if_full && !sm->isr_full) { 
+        PRINTI("push does nothing because isr is not full (and iffull specified)n");
+        return true;
     }
     if (block && (sm->fifo.rx_state == FIFO_FULL)) {
         PRINTI("push blocked because fifo is full\n");
@@ -790,19 +796,26 @@ bool run_push_instruction(instruction_t * instruction) {
     fifo_push(&(sm->fifo), sm->isr);
     sm->isr = 0;
     sm->shift_in_count = 0;
+    sm->isr_full = false;
     return true;
 }
 
 bool run_autopush(instruction_t * instruction) {
     sm_t * sm = (sm_t *) instruction->executing_sm;
     int push_threshold = sm->shiftctl_push_thresh;
-    PRINTD("trying autopush, threshold:%d; count:%d, fifo state: %d\n", push_threshold, sm->shift_in_count, sm->fifo.rx_state);
-    if (sm->shift_in_count < push_threshold) return true; /* completed but no push, not ready for it yet */
-    if (sm->fifo.rx_state == FIFO_FULL) return false; /* simulate the block/stall */
+    if (!sm->isr_full) {
+        PRINT("internal error: should not attempt autopush when isr is not full\n");
+        return true;
+    }
+    if (sm->fifo.rx_state == FIFO_FULL) {
+        PRINTI("autopush stalled because fifo is full\n");
+        return false; 
+    }
     /* if we didn't block or return without doing anything, the actually do the push */
     fifo_push(&(sm->fifo), sm->isr);
     sm->isr = 0;
     sm->shift_in_count = 0;
+    sm->isr_full = false;
     return true;
 }
 
@@ -840,11 +853,14 @@ bool run_in_instruction(instruction_t * instruction) {
     stalled = false;
     switch (instruction->source) {
         case pins_source:
+            nbits = 0;
             for (n = 0; n < bits_todo; n++) {
                 gpio = (sm->in_pins_base + n) % 32;
                 bit_to_input = hardware_get_gpio(gpio);
-                set_nth_bit_to(n+sm->shift_in_count, &(sm->isr), bit_to_input);
+                set_nth_bit_to(n, &nbits, bit_to_input);
+                PRINTI("got %d from pin %d, nbits=%08X, bits_todo=%d\n", bit_to_input, gpio, nbits, bits_todo);
             }
+            shift_n_then_copy(shift_direction, nbits, &(sm->isr), bits_todo);
             break;
         case x_source:
             shift_n_then_copy(shift_direction, sm->scratch_x, &(sm->isr), bits_todo);
@@ -869,12 +885,14 @@ bool run_in_instruction(instruction_t * instruction) {
         default: PRINT("Error: invalid source for IN instruction %d, line %d\n", instruction->source, instruction->line);
     };
     sm->shift_in_count = sm->shift_in_count + bits_todo;
-    if (sm->shift_in_count > 32) sm->shift_in_count = 32;
-    if ( sm->autopush && (shift_threshold > 0) && (sm->shift_in_count >= shift_threshold) ) {
-        completed = run_autopush(instruction);
-        stalled = !completed;
-        if (stalled) sm->shift_in_resume_count = bits_todo; // the push stalled so we can't complete shifting and will need to resume later
-        else sm->shift_in_resume_count = 0;
+    if ( (shift_threshold > 0) && (sm->shift_in_count >= shift_threshold) || (sm->shift_in_count >= 32) ) {
+        PRINTI("isr is now full\n");
+        sm->isr_full = true;
+        if (sm->autopush) {
+            PRINTI("running autopush\n");
+            completed = run_autopush(instruction);
+        }
+        else completed = true;
     }
     else completed = true;
     return completed;
@@ -889,9 +907,9 @@ bool run_pull_instruction(instruction_t * instruction) {
     bool only_if_shifting_complete = instruction->if_empty;
     bool block = instruction->block;
     bool try_to_pull;
-    if (only_if_shifting_complete) { 
-        int pull_threshold = sm->shiftctl_pull_thresh;   /* instruction_find_definition("SHIFTCTRL_PULL_THRESH", 32); */
-        if (sm->shift_out_count < pull_threshold) return true;  /* instruction completed without doing anything */
+    if (instruction->if_empty && !sm->osr_empty) { 
+        PRINTI("pull does nothing because osr is not empty (and ifempty specified)\n");
+        return true;
     }
     if (sm->fifo.tx_state == FIFO_EMPTY) {
         if (block) {
@@ -906,22 +924,31 @@ bool run_pull_instruction(instruction_t * instruction) {
             return true;  /* simulate the block by returning that this instruction wasn't completed */
         }
     }
-    /* if we didn't block or return without doing anything, the actually do the pull */
+    /* if we didn't block or return without doing anything, then actually do the pull */
     fifo_pull(&(sm->fifo), &(sm->osr));
     PRINTI("Pulled %d from FIFO into OSR\n", sm->osr);
     sm->shift_out_count = 0;
     sm->shift_out_resume_count = 0;
+    sm->osr_empty = false;
     return true;
 }
 
 bool run_autopull(instruction_t * instruction) {
     sm_t * sm = (sm_t *) instruction->executing_sm;
-    int pull_threshold = sm->shiftctl_pull_thresh;
-    if (sm->shift_out_count < pull_threshold) return true; /* completed but no push, not ready for it yet */
-    if (sm->fifo.tx_state == FIFO_EMPTY) return false; /* simulate the block/stall */
-    /* if we didn't block or return without doing anything, the actually do the pull */
+    if (!sm->osr_empty) {
+        PRINT("internal error: should not attempt autopull when osr is not empty\n");
+        return true;
+    }
+    if (sm->fifo.tx_state == FIFO_EMPTY) {
+        PRINTI("autopull stalled because fifo is empty\n");
+        return false; /* simulate the block/stall */
+    }
+    /* if we didn't block or return without doing anything, then actually do the pull */
     fifo_pull(&(sm->fifo), &(sm->osr));
+    PRINTI("pulled %08X\n", sm->osr);
     sm->shift_out_count = 0;
+    sm->shift_out_resume_count = 0;
+    sm->osr_empty = false;
     return true;
 }
 
@@ -961,23 +988,32 @@ bool run_autopull(instruction_t * instruction) {
 
 bool run_out_instruction(instruction_t * instruction) {
     sm_t * sm = (sm_t *) instruction->executing_sm;
-    bool completed, stalled;
+    bool completed;
     uint8_t n, bits_todo;
     int gpio;
     bool bit_to_output;
     uint32_t nbits;
     int shift_threshold = sm->shiftctl_pull_thresh; 
     int shift_direction = sm->shiftctl_out_shiftdir; 
+    if (sm->osr_empty) {
+        if (sm->autopull)  {
+            PRINTI("Performing Auto Pull\n");
+            completed = run_autopull(instruction);
+            if (!completed) return false;
+        }
+        else {
+            PRINTI("Waiting because OSR empty and no autopull\n");
+            return false;
+        }
+    }
     /* if there was an autopull that stalled previously, then we couldn't complete previously so we need to resume shifting now instead of starting anew */
     if (sm->shift_out_resume_count > 0) bits_todo = sm->shift_out_resume_count;
     else {
         if (instruction->source == pins_source) bits_todo = (sm->out_pins_num > instruction->bit_count) ? instruction->bit_count : sm->out_pins_num;
         else bits_todo = instruction->bit_count;
     }
-    if ( (shift_threshold > 0 && sm->shift_out_count >= shift_threshold) || (sm->shift_out_count >= 32) ) stalled = true;
-    else stalled = false;
     nbits = copy_n_then_shift(shift_direction, &(sm->osr), bits_todo);
-    PRINT("nbits=%08X\n", nbits);
+    PRINTI("nbits=%08X (shifted %d)\n", nbits, bits_todo);
     switch (instruction->destination) {
         case pins_destination:
             for (n = 0; n < bits_todo; n++) {
@@ -1022,19 +1058,12 @@ bool run_out_instruction(instruction_t * instruction) {
     };
     sm->shift_out_count = sm->shift_out_count + bits_todo;
     if (sm->shift_out_count > 32) sm->shift_out_count = 32;
-    if ( (shift_threshold > 0) && (sm->shift_out_count >= shift_threshold) ) stalled = true;
-    else stalled = false;
-    //if need to autopull
-    if (sm->autopull && stalled)  {
-        PRINTI("Performing Auto Pull\n");
-        completed = run_autopull(instruction);
-        if (completed) sm->shift_out_resume_count = 0;
+    if ( (shift_threshold > 0) && (sm->shift_out_count >= shift_threshold) || (sm->shift_out_count >= 32) ) {
+        PRINTI("osr is now empty\n");
+        sm->osr_empty = true;
     }
-    else {
-        completed = true;
-        sm->shift_out_resume_count = 0;
-    }
-    if (completed && instruction->destination == pc_destination) {
+    completed = true; 
+    if (instruction->destination == pc_destination) {
         pio_t * pio = (pio_t *) sm->pio;
         if (0 <= sm->pc_temp && sm->pc_temp < pio->next_instruction_location) {
           PRINTI("setting PC to %d\n", sm->pc_temp);
@@ -1042,7 +1071,7 @@ bool run_out_instruction(instruction_t * instruction) {
         }
         else PRINTI("No instruction at PC %d, ignoring\n", sm->pc_temp);
     }
-    if (completed && instruction->destination == exec_destination) {
+    if (instruction->destination == exec_destination) {
         PRINTD("to execute %04X\n", sm->exec_machine_instruction);
         completed = false;
         if (exec_instruction_decode(sm)) {
@@ -1197,7 +1226,7 @@ bool run_set_instruction(instruction_t * instruction) {
     uint32_t value = instruction->index_or_value;
     switch(instruction->destination) {
         case pins_destination: 
-            PRINTI("setting pins %d..%d to %d\n", sm->set_pins_base, sm->set_pins_base + sm->set_pins_num, value);
+            PRINTI("setting pins %d..%d to %d\n", sm->set_pins_base, sm->set_pins_base + (sm->set_pins_num-1), value);
             for (pin_num = sm->set_pins_base; pin_num < (sm->set_pins_base + sm->set_pins_num); pin_num++) {
                 hardware_set_gpio(pin_num, value %  2);
                 value = value >> 1;
@@ -1281,6 +1310,21 @@ bool run_read_instruction(user_instruction_t * instruction) {
     }
     else completed = false;
     return completed;
+}
+
+/********************************
+ **** PRINT Instruction *********
+ *******************************/
+
+/* print is a meta instruction to print a user var as a 32 bit hex number */
+bool run_print_instruction(user_instruction_t * instruction) {
+    bool completed;
+    bool rc;
+    uint32_t value;
+    rc = instruction_var_get(instruction->var_name, &value);
+    if (!rc) { PRINT("unable to print %s, variable not defined\n", instruction->var_name); }
+    else PRINT("%s = %08X\n", instruction->var_name, value);
+    return true;
 }
 
 /********************************
@@ -1496,6 +1540,7 @@ bool exec_run_user_instruction(user_instruction_t * instruction) {
         switch (instruction->instruction_type) {
             case write_instruction:       completed = run_write_instruction(instruction); break;
             case read_instruction:        completed = run_read_instruction(instruction); break;
+            case user_print_instruction:  completed = run_print_instruction(instruction); break;
             case data_instruction:        completed = run_data_instruction(instruction); break;
             case pin_instruction:         completed = run_pin_instruction(instruction); break;
             case repeat_instruction:      completed = run_repeat_instruction(instruction); break;

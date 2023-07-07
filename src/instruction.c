@@ -250,7 +250,7 @@ bool instruction_user_add(user_instruction_t* instr){
     CURRENT_USER_INSTRUCTION.executing_sm = (void *) hardware_sm_set();
     snprintf(CURRENT_USER_INSTRUCTION.var_name, SYMBOL_MAX, "%s", instr->var_name);
     hardware_init_current_up_pc_if_needed(hardware_user_processor_set()->next_instruction_location);  /* first instruction added for this sm will be the first to execute on this sm */
-    CURRENT_INSTRUCTION.address = hardware_user_processor_set()->next_instruction_location;
+    CURRENT_USER_INSTRUCTION.address = hardware_user_processor_set()->next_instruction_location;
     hardware_user_processor_set()->next_instruction_location++;
     return true;
 }                         

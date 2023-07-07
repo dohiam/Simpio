@@ -218,6 +218,17 @@ void ui_process_char(editor_t *ed, int ch) {
       ed_display(ed);
       /* editor will pick up the new breakpoint state and display appropriately  */
       break;
+    case KEY_F(12):
+          ui_temp_window_open();
+          ui_temp_window_write("f = show fifos\n");
+          ui_temp_window_write("any other key to exit\n\n");
+          ch = wgetch(temp_window);
+          if (ch == 'f' || ch == 'F') {
+              werase(temp_window);
+              (*ui_user_functions->show_fifos)();
+          }
+          ui_temp_window_close();
+          break;
     default:
       switch (current_mode) {
           case timeline_parameter_mode:
@@ -239,8 +250,8 @@ static int timeline_dialog_input_positions[5][2] = { { 3, 9 }, { 5, 9 }, { 7, 9 
 static int timeline_dialog_field_num;
 
 static ui_timeline_dialog_data_t timeline_dialog_data;
-
-static int* timeline_tab() {
+static int* timeline_tab() {(*ui_user_functions->show_fifos)('f');
+                            
  if (++timeline_dialog_field_num >= TIMELINE_DIALOG_NUM_FIELDS) timeline_dialog_field_num = 0;
     return timeline_dialog_input_positions[timeline_dialog_field_num];
 }
@@ -562,3 +573,14 @@ void ui_show_timeline_window(ui_timeline_display_data_t * data) {
     return;
 }
 
+WINDOW *temp_window;
+
+void ui_temp_window_open() {
+    int max_x, max_y;
+    getmaxyx(stdscr, max_y, max_x);
+    temp_window = newwin(SRC_LINES, SRC_COLS, SRC_START_Y, SRC_START_X);
+}
+
+void ui_temp_window_close() {
+        endwin();
+}
