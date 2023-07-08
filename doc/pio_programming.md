@@ -377,15 +377,23 @@ Would result in:
 0000 0000 0000 0000 0000 0000 0110 1001
 ```
 
+But if the byte read needs to be on the left in the reverse order, then the following:
 
+```
+	MOV ISR :: ISR
+```
+
+Would result in:
+
+```
+0000 0000 0000 0000 0000 0000 1001 0110
+```
 
 So if the ISR is pushed into the RX FIFO and read by a user program, the user program would read the 32 bit value: 6900000000000000 in hex, or 7566047373982433280 in decimal. By adding one additional OUT instruction from null:
 
 ```
 		OUT null, 
 ```
-
-
 
 And the following shows a complete read sequence "to the left":
 
@@ -398,18 +406,6 @@ And the following shows a complete read sequence "to the left":
 1=> 0000 0000 0000 0000 0000 0000 0010 0101 
 1=> 0000 0000 0000 0000 0000 0000 0100 1011 
 0=> 0000 0000 0000 0000 0000 0000 1001 0110 
-```
-
-And using the following to reverse the bit order:
-
-```
-		MOV ISR :: ISR
-```
-
-Would result in 
-
-```
-0000 0000 0000 0000 0000 0000 0110 1001
 ```
 
 To configure input shifting to the left:
@@ -849,12 +845,15 @@ The user program to write data looks like:
 
 ```
 .config user_processor 0
+.config serial usb
 
     DATA SET "some test data."
     DATA WRITE 
 ```
 
 This simple program uses some new instructions not previously discussed. Each user processor has a small amount of data area to hold a string (sequence of bytes). The first "DATA SET" instruction sets this data area to a given string. The second "DATA WRITE" instruction puts each byte of the string in the data area into the TX FIFO, one byte at a time. Note that this will take several cycles to complete, and many of the cycles it will be waiting for space in the TX FIFO to add another byte. So this "DATA WRITE" instruction will run concurrently with the other four parts of this example for most of the execution life of this overall example program.
+
+Note: the "serial usb" config line is only for assisting in moving to real hardware which is discussed in a later section.
 
 The PIO program to read the bytes looks like:
 
@@ -891,9 +890,23 @@ The last thing this second user program does is to exit the overall program, whi
 
 One could also step through this overall program, one instruction at a time, to follow how it works in more detail, but as there are a lot of delays and waiting for things to happen, a better approach would be to set a breakpoint or two, and watch what happens in between theses. A good choice would be to set two breakpoints, one on each JMP statement, and then repeatedly pressing PF5, observing changes to the GPIO pins, FIFOs, and the output and input shift registers.
 
+### Serial I/O
+
+TBD
+
+### SPI Flash
+
+TBD
+
+### Parallel LCD
+
+TBD
+
 ## Part 6 - Advanced Topics => Tips & Tricks
 
 TBD: Keeping PIN/GPIO naming straight, summary of instructions and major functions & what type of numbering/indexing scheme they each use.
+
+TBD: Discussion of DMA
 
 
 
@@ -1020,46 +1033,31 @@ make
 
 Then simply copy the blink.uf2 file to a standard Pico board when it is in mass storage mode and observe the blinking LED.
 
-TBD- add discussion of USB output vs RS232 and how to configure.
+### Additional Support for Moving to Real Hardware
 
-TBD- add generation of multicore, use the parallel I/O example.
+#### Print Output
+
+In Simpio, all output from the simulator and user programs goes to the status window of the simulator UI (or to the terminal window if running in interactive mode). In real hardware, output from user programs can be directed either to the built-in serial hardware or over USB. By adding a line under the first user processor (zero) that looks like ".config serial usb", output from user programs can be directed across the USB connection (to minicom for example). Similarly, adding ".config serial rs232" will direct output from user programs to the built-in serial hardware.
+
+A 5 second delay is added to the start of the first user program and before the PIO programs are initialized to help ensure all the user program output is seen. This is needed because minicom won't open the USB serial connection if that USB serial connection device doesn't exist and it doesn't exist unless the Pico board is connected over USB and up and running, but if the Pico board is up and running, it is spewing print output to nowhere until minicom is up. The 5 second delay helps one get minicom connected before the the Pico programs actually start doing their thing.
+
+#### Multi-Processor Support
+
+In addition to supporting multiple PIO/SM programs, Simpio supports two user programs; these are mapped to the two ARM processors on real Pico hardware. The generate.py outputs C code that sets up the first user program running on user processor 0 to the main ARM processor and the second user program running on user processor 1 to the second ARM processor. In this way, both user programs can run the same way in both the Simulator and on real Pico hardware. 
+
+See the parallel and serial examples in the tests_real directory for examples.
+
+#### DMA Support
+
+TBD
 
 ### Additional Details to Map Simpio Statements to SDK Functions
 
-The configuration performed by .config statements under Simpio pio is performed by function calls using the Pico SDK. However, there is a direct correspondence between the .config statements and  the corresponding C functions; the same arguments and order is used in each of them. This makes it very straightforward to create the corresponding function calls using the following mapping (and this is exactly what the "generate.py" script does). The following is a summary of the mapping:
+The configuration performed by .config statements under Simpio pio is performed by function calls using the Pico SDK. However, there is a direct correspondence between the .config statements and  the corresponding C functions; the same arguments and order is used in each of them. This makes it very straightforward to create the corresponding function calls using the following mapping (and this is exactly what the "generate.py" script does). 
 
-> `.config jmp_pin #                       `
-> `=>  void sm_config_set_jmp_pin (pio_sm_config *c, uint pin=#)`   
->
-> `.config set_pins # #                    `
-> `=>  void pio_sm_set_set_pins (PIO pio, uint sm, uint set_base=#, uint set_count=#)`
->
-> `.config in_pins #                       `
-> `=>  void sm_config_set_in_pins (pio_sm_config *c, uint in_base=#)`
->
-> `.config out_pins # #                    `
-> `=>  void sm_config_set_out_pins (pio_sm_config *c, uint out_base=#, uint out_count=#)`
-> (and also pio_gpio_init(pio, pin_number); for each output PIN used )
->
-> `.config side_set_pins  #                `
-> `=>  void sm_config_set_sideset_pins (pio_sm_config *c, uint sideset_base)`
->
-> `.config side_set_count # # #            `
-> `=>  void sm_config_set_sideset (pio_sm_config *c, uint bit_count, bool optional, bool pindirs)`
->
-> `.config shiftctl_out # # #              `
-> `=>  void sm_config_set_out_shift (pio_sm_config *c, bool shift_right, bool autopull, uint pull_threshold)`
->
-> `.config shiftctl_in # # #               `
-> `=>  void sm_config_set_in_shift (pio_sm_config *c, bool shift_right, bool autopush, uint push_threshold)`
->
-> `.config execctl_status_sel # #          `
-> `=>  void sm_config_set_mov_status (pio_sm_config *c, enum pio_mov_status_type status_sel, uint status_n)`
->
-> `.config fifo_merge #                    `
-> `=>  void sm_config_set_fifo_join (pio_sm_config *c, enum pio_fifo_join join)`
+Additional C functions are generated and added to the output .c file to support the read, write, data, and print statements on real hardware, mimicking the behavior these statements have in the Simpio simulator.
 
-One can also study the translation steps performed in the "generate.py" script as well as studying the output files it produces to learn more. One can also modify the "generate.py" script as desired to customize the output for one's particular needs (and tastes in structuring the output code organization).
+One can also study the translation steps performed in the "generate.py" script as well as studying the output files it produces from the example in the tests_real directory to learn more. One can also modify the "generate.py" script as desired to customize the output for one's particular needs (and tastes in structuring the output code organization).
 
 ### Moving to Real Hardware Using MicroPython
 
