@@ -10,9 +10,9 @@
 .config pio 0
 .config sm 0
 .config out_pins 1 2
-.config shiftctl_out_shiftdir 1 0 4    ; shift from msb to lsb, no autopull, threshold 4
-.config side_set_pins 20               ; base=20
-.config side_set_count 1 1 0           ; num_pins=1, optional=1, pindirs=0 
+.config shiftctl_out 1 0 4      ; shift from msb to lsb, no autopull, threshold 4
+.config side_set_pins 20        ; base=20
+.config side_set_count 1 1 0    ; num_pins=1, optional=1, pindirs=0 
 .config execctrl_status_sel 0 1 ; 1=rx, 0=tx, status all ones if level of chosen FIFO is < specified number, else all zeros
 .config user_processor 0
 

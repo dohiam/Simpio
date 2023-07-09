@@ -12,7 +12,7 @@
 .config pio 0
 .config sm 0
 .config in_pins 1
-.config shiftctl_in_shiftdir 0 0 4       ; shift to the left, no autopush, threshold 4
+.config shiftctl_in 0 0 4       ; shift to the left, no autopush, threshold 4
 .config user_processor 0
 .config user_var A
 

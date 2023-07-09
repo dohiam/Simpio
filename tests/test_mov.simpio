@@ -14,7 +14,7 @@
 .config user_processor 0
 .config in_pins 0
 .config out_pins 10 2
-.config shiftctl_in_shiftdir 1 0 32     ; shift to the right, no autopush, no threshold
+.config shiftctl_in 1 0 32             ; shift to the right, no autopush, no threshold
 .config execctrl_status_sel 0 1        ; 1=rx, 0=tx, status all ones if level of chosen FIFO is < specified number, else all zeros
 
 ; first test PC and EXEC destnations which are a little tricky because they effect execution flow
