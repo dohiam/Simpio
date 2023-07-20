@@ -375,7 +375,11 @@ void printf_hardware_configuration() {
                 printf("         shift out dir: %d\n", sm->shiftctl_out_shiftdir);
             }
         }
-    } 
+    }
+    printf("Devices Enabled: \n");
+    FOR_ENUMERATION(device, hardware_device_t, hardware_device_enumerator) {
+        if (device->enabled) printf("    %s\n", device->name);
+    }    
 }
 
 /**********************************************************************************

@@ -47,9 +47,9 @@
                                                     if (*e > MAX) *e = MAX;                        \
                                                     return temp;                                   \
                                                 }
-#define FOR_ENUMERATION(PTR, T, NAME)                                                                 \
+#define FOR_ENUMERATION(PTR, T, NAME)                                                              \
 T * PTR;                                                                                           \
-NAME ## _enumerator_t PTR ## e;                                                                        \
+NAME ## _enumerator_t PTR ## e;                                                                    \
 for (PTR = NAME ## _first(&PTR ## e); PTR != NULL; PTR = NAME ## _next(&PTR ## e))          
 
 #endif

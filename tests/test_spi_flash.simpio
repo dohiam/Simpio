@@ -1,0 +1,117 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; User program first writes a command prefix;
+; - most significant 6 bits says how many bits are in the command (typically either 8 or 32)
+; - next bit whether to read (one) or write (zero)
+; - next bit is reserved
+; - lower 24 bits read or write
+;
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+.program spi_flash_transaction
+.config pio 0
+.config sm 0
+.config out_pins 19 1
+.config shiftctl_out 0 1 32
+.config in_pins 16
+.config shiftctl_in 0 1 32
+.config side_set_pins 18
+.config side_set_count 1 1 0    ; num_pins=1, optional=1, pindirs=0 
+.config set_pins 17 1
+.device spi_flash 18 19 16 17   ; clk = 18, tx = 19, rx = 16, cs = 17
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; start transaction: get all input
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+start:
+        SET  PINS, 1    [4]         ; CS stays high until transaction starts
+        PULL                        ; when user writes cmd prefix
+        SET  PINS, 0    [4]         ;      then start transaction
+        OUT  X, 6                   ; X <- cmd length in bits (8 or 32)
+        OUT  Y, 1                   ; Y <- read bit
+        OUT  NULL, 1                ; reserved/ignored
+        OUT  ISR, 24                ; ISR <- num bytes to read or write
+        PULL                        ; when user writes cmd (optionally plus address)
+        
+        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; output the command (+addr)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+outcmd: 
+        JMP X-- outx                ; decrement first so X is num times thru loop
+        JMP start                   ; if zero bits skip
+outx:
+        OUT PINS 1 side 1 [2]       ; send bit with clk high, delay
+        JMP X-- outx side 0 [2]     ; clk low, repeat X times
+        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; write or read ? Set Y to number & reset ISR
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        JMP !Y  not2read            ; if bits to read, input them
+        MOV Y, ISR                  ; Y <- bits to read
+        SET X, 0                    ; clear ISR
+        MOV ISR,X                   ;       and reset it
+        JMP !Y, start               ; if zero bites to read, start again
+        JMP Y--, inbits             ; decrement first so Y is exactly num bits to read
+not2read:
+        MOV Y, ISR                  ; Y <- bits to write
+        SET X, 0                    ; clear ISR
+        MOV ISR,X                   ;       and reset it
+        JMP !Y, start               ;      if bits to write, output them, else go back to start
+        JMP Y--, outbits            ; decrement first so Y is exactly num bits to write
+        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; output Y bits
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+outbits:
+        OUT PINS 1 side 1 [2]       ; send bit with clk high, delay
+        JMP Y-- outbits side 0 [2]  ; repeat for Y bits
+        JMP start                   ; either output or input, never both
+        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; input Y bits
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+inbits:     
+        IN  PINS 1 side 1 [2]       ; read input
+        JMP Y--, inbits side 0 [2]  ; repeat for Y bits
+        PUSH                        ; get any remaining bits not auto-pushed
+        JMP start
+
+;-----------------
+; end of program -
+;-----------------
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; user program
+; 1) get manufacturer ID into A & B
+; 2) write enable and erase flash
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config user_processor 0
+.config user_var A
+.config user_var B
+.config user_var C
+.config user_var D
+
+        WRITE 0x82000010    ; 1000 0010 ... 0010 = 100000 (32 bits) + 10 (read) + 0001 0000 (16 bits)
+        WRITE 0x90000000    ; 0x90 (cmd - read manufacturer id) = zero address
+        READ  A
+        WRITE 0x40000000    ; 00100 00 .. 00 = 001000 (8 bits)
+        WRITE 0x06000000    ; 0x06 (cmd - write enable)
+        WRITE 0x82000000    ; 1000 0010 ... 0010 = 100000 (32 bits) + 00 (don't read read) + 0000 (0 bytes) 
+        WRITE 0x20000000    ; 0x20 (cmd - erase sector) + zero address
+        WRITE 0x82000020    ; cmd + address + read + 4 bytes (32 bits)
+        WRITE 0x03000000    ; 0x03 (cmd - read) + zero address
+        READ  A             ; should be all ff
+        READ  B             ; dummy read because bits to read was exact multiple of 32
+        WRITE 0x40000000    ; 00100 00 .. 00 = 001000 (8 bits)
+        WRITE 0x06000000    ; 0x06 (cmd - write enable)
+        WRITE 0x80000020    ; cmd + address + not-read + 4 bytes (32 bits)
+        WRITE 0x02000000    ; 0x02 (cmd - write) + zero address
+        WRITE 0xABCDEF12    ; 3 bytes of data
+        WRITE 0x82000020    ; cmd + address + read + 4 bytes (32 bits)
+        WRITE 0x03000000    ; 0x03 (cmd - read) + zero address
+        READ  A             ; should be ABCDEF12
+        EXIT

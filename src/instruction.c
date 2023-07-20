@@ -230,6 +230,10 @@ bool instruction_add(instruction_t* instr) {
 }
 
 bool instruction_user_add(user_instruction_t* instr){
+    if ( (hardware_up_num_set() != 0) && (hardware_up_num_set() != 1) ) {
+        PRINT("ERROR: user instruction on line %d, but no user processor set (.config user_processor <0|1?\n", instr->line);
+        return false;
+    }
     if (hardware_user_processor_set()->next_instruction_location == NUM_USER_INSTRUCTIONS) {
         PRINT("\nERROR line %d: number of user instructions (%d) exceeded\n", instr->line, NUM_USER_INSTRUCTIONS);
         return false;

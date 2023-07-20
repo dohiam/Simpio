@@ -18,6 +18,8 @@ static ui_user_functions_t * ui_user_functions;
 
 static char buff[100];
 
+static bool timeline_parameters_set = false;
+
 WINDOW *src_win, *regs_win, *status_win;
 
 #define ERROR_MSG_MAX 100
@@ -208,10 +210,12 @@ void ui_process_char(editor_t *ed, int ch) {
     case KEY_F(8):
       current_mode = timeline_parameter_mode;
       (*ui_user_functions->get_timeline_params_function) ();
+      timeline_parameters_set = true;
       current_mode = debug_mode;
       ed_display(ed);
       break;
     case KEY_F(9):
+      if (!timeline_parameters_set) return;
       current_mode = timeline_window_mode;
       (*ui_user_functions->show_timeline_function)();
       current_mode = debug_mode;
@@ -220,13 +224,7 @@ void ui_process_char(editor_t *ed, int ch) {
       break;
     case KEY_F(12):
           ui_temp_window_open();
-          ui_temp_window_write("f = show fifos\n");
-          ui_temp_window_write("any other key to exit\n\n");
-          ch = wgetch(temp_window);
-          if (ch == 'f' || ch == 'F') {
-              werase(temp_window);
-              (*ui_user_functions->show_fifos)();
-          }
+          (*ui_user_functions->temp_window_handler)();
           ui_temp_window_close();
           break;
     default:
@@ -250,8 +248,7 @@ static int timeline_dialog_input_positions[5][2] = { { 3, 9 }, { 5, 9 }, { 7, 9 
 static int timeline_dialog_field_num;
 
 static ui_timeline_dialog_data_t timeline_dialog_data;
-static int* timeline_tab() {(*ui_user_functions->show_fifos)('f');
-                            
+static int* timeline_tab() {                            
  if (++timeline_dialog_field_num >= TIMELINE_DIALOG_NUM_FIELDS) timeline_dialog_field_num = 0;
     return timeline_dialog_input_positions[timeline_dialog_field_num];
 }
@@ -583,4 +580,8 @@ void ui_temp_window_open() {
 
 void ui_temp_window_close() {
         endwin();
+}
+
+void ui_temp_window_clear() {
+        werase(temp_window);
 }

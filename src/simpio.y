@@ -19,6 +19,7 @@
 #include "ui.h"
 #include "parser.h"
 #include "print.h"
+#include "devices.h"
 
 extern FILE *yyin;
 extern int yylineno;
@@ -121,7 +122,8 @@ int simpio_test_build(int argc, char** argv)
 %token _BANG _COLON _COLON_COLON
 
 %token _CONFIG _PIO _SM _PIN_CONDITION _SET_PINS _IN_PINS _OUT_PINS _SIDE_SET_PINS _SIDE_SET_COUNT _USER_PROCESSOR _FIFO_MERGE _CLKDIV _DATA_CONFIG _SERIAL _USB _RS232
-%token _SHIFTCTL_OUT _SHIFTCTL_IN
+%token _SHIFTCTL_OUT _SHIFTCTL_IN 
+%token _DEVICE _SPI_FLASH
 
 %token <ival> _BINARY_DIGIT _HEX_NUMBER _BINARY_NUMBER _DECIMAL_NUMBER _DELAY
 %token <sval> _SYMBOL 
@@ -142,8 +144,8 @@ int simpio_test_build(int argc, char** argv)
 statement_list: statement _EOL  { PRINTD("----------Done with line %d; going to next line----------\n", line_count+1); line_count++; } |  
                 statement_list statement _EOL { PRINTD("----------Done with line %d; going to next line----------\n", line_count+1); line_count++; } ;
 
-statement:  /* empty */ | label | directive | instruction_side { ci.line = line_count+1; if(!instruction_add(&ci)) exit(-1); instruction_set_defaults(&ci); } | 
-                                              user_instruction_continue { uci.line = line_count+1; if (!instruction_user_add(&uci)) exit(-1); instruction_set_user_defaults(&uci); };
+statement:  /* empty */ | label | directive | instruction_side {  ci.line = line_count+1; if(!instruction_add(&ci)) {yylineno--; return -1;} instruction_set_defaults(&ci); } | 
+                                              user_instruction_continue { uci.line = line_count+1; if (!instruction_user_add(&uci)) {yylineno--; return -1;} instruction_set_user_defaults(&uci); };
 
 label: _SYMBOL _COLON { PRINTD("label: %s\n", $1); instruction_add_label($1); } ;
 
@@ -151,7 +153,7 @@ label: _SYMBOL _COLON { PRINTD("label: %s\n", $1); instruction_add_label($1); } 
  *  directives: program, origen, side_set, opt_pindirs, wrap, lang_opt, and word
  ****************************************************************************************************************/
  
-directive: define_directive | program_directive | origen_directive | wrap_target_directive | wrap_directive | lang_opt_directive | word_directive | config_directive | data_directive;
+directive: define_directive | program_directive | origen_directive | wrap_target_directive | wrap_directive | lang_opt_directive | word_directive | config_directive | data_directive | device_directive;
 
 config_directive: _CONFIG config_statement
 
@@ -187,8 +189,10 @@ lang_opt_directive: _LANG_OPT _SYMBOL  { /* todo */ }
 
 word_directive:  _WORD expression { /* todo */ }
 
+device_directive: _DEVICE _SPI_FLASH number number number number { devices_enable_spi_flash($3, $4, $5, $6); }
+
 /****************************************************************************************************************
- * instructions: jmp, nop, wait, in, out, push, pull, mov, irq, set
+ * instructions: 
  ****************************************************************************************************************/
  
 instruction_side: instruction {ci.side_set_value= -1; ci.delay=0;} | instruction _SIDE number { ci.side_set_value = $3;  ci.delay=0;} |

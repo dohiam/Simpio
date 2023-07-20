@@ -90,7 +90,7 @@ void update_regs() {
                wattroff(regs_win, A_BOLD);      
             }
             if (var && (var->name[0] != 0) ) { 
-              if (var->has_value) { regs_msg("%s=%08X", var->name, var->value); }
+              if (var->has_value) { regs_msg("  %s=%08X", var->name, var->value); }
               else regs_msg("  %s=___", var->name);
               var = user_variable_next(&var_e);
             }
@@ -130,7 +130,7 @@ void update_regs() {
             print_with_change(scratch_y,"Y:%08X ") 
             print_with_change(exec_machine_instruction,"EXEC:%08X \n") 
             regs_msg("PC:%02d",sm->pc);
-            if (sm->osr_empty) wattron(regs_win, A_BOLD);
+            if (!sm->osr_empty) wattron(regs_win, A_BOLD);
             regs_msg(" OSR");
             wattroff(regs_win, A_BOLD);      
             print_with_change(shift_out_count,"-%02d") 
@@ -367,10 +367,49 @@ void show_fifos() {
          ui_temp_window_write("      %08X\n", sm->fifo.buffer[i]);
        }
     }
-    while ( (ch = ui_temp_window_getch()) != 'q' ) ui_temp_window_write("try again; q to exit\n");
 }
 
-ui_user_functions_t ui_functions = {&buildit, &stepit, &toggleit, &runit, &saveit, &get_timeline_parameters, &show_timeline, &show_fifos, NULL};  // filename filled in later
+int temp_window_handler() {
+    int num_devices = 0;
+    int ch, rc, rc2;
+    device_display_handler_t devices[MAX_DEVICES];
+    if (!built) {
+      ui_temp_window_write("nothing to show until program is built and running\n");
+    }
+    else {
+        ui_temp_window_write("f = show fifos\n");
+        FOR_ENUMERATION(device, hardware_device_t, hardware_device_enumerator) {
+            if (device->enabled) {
+                ui_temp_window_write("%d = display state information for %s\n", num_devices, device->name);
+                devices[num_devices] = device->display_handler;
+                num_devices++;
+            }    
+        }
+    }
+    ui_temp_window_write("q = exit\n\n");
+    for (ch = getch(); (ch != 'q' && ch != 'Q'); ch = getch()) {
+        if (ch == 'f' || ch == 'F') {
+            werase(temp_window);
+            show_fifos();
+        }
+        if ('0' <= ch && ch <= '9') {
+            ch = ch - '0';
+            if (0 <= ch && ch < num_devices) {
+                rc2 = ((*devices[ch])());
+                if (rc2) {
+                    do {
+                        for (int i=0; i<rc2; i++) rc = stepit();
+                        rc2 = ((*devices[ch])());
+                    } while (rc2);
+                }
+            }
+            return rc;
+        }
+    }
+    return 0;
+}
+
+ui_user_functions_t ui_functions = {&buildit, &stepit, &toggleit, &runit, &saveit, &get_timeline_parameters, &show_timeline, &temp_window_handler, NULL};  // filename filled in later
 
 int main_test(int argc, char** argv) {
   instruction_or_user_instruction_t instr;

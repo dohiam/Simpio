@@ -1,0 +1,85 @@
+;!
+;  @file /spi_flash_basic.simpio
+;  @brief Tests data operations
+;  @details
+;  basic spi send/receive for spi_flash
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+
+; sck=18, tx=19, rx=16, cs=17
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Sender
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+.program sender
+.side_set 1 opt
+
+output_loop:
+    PULL
+    SET X, 7
+outbit:
+    OUT PINS, 1 side 1 [2]
+    JMP X--, outbit side 0 [2]
+    JMP output_loop
+
+
+% c-sdk {
+static inline void sender_init(PIO pio, uint sm, uint clk, uint tx) {
+    uint offset = pio_add_program(pio, &sender_program);
+    pio_sm_config sm_config = sender_program_get_default_config(offset);
+    pio_sm_claim(pio, sm);
+    
+    sm_config_set_sideset_pins(&sm_config,clk);
+    pio_sm_set_consecutive_pindirs(pio, sm, clk, 1, true);
+    pio_gpio_init(pio, clk); 
+    
+    sm_config_set_out_pins(&sm_config,tx,1);
+    pio_sm_set_consecutive_pindirs(pio, sm, tx, 1, true);
+    pio_gpio_init(pio, tx); 
+    sm_config_set_out_shift(&sm_config,0,0,8);    
+    
+    sm_config_set_clkdiv_int_frac (&sm_config, 125, 0);
+    pio_sm_init(pio, sm, offset, &sm_config);
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Receiver
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+.program receiver
+.side_set 1 opt
+
+input_loop:
+    PULL
+    SET  X,7
+get_byte:
+    IN  PINS 1 side 1 [2]             ; read input, auto-push at byte
+    JMP X--, get_byte side 0 [2]      ; repeat until all is read 
+    PUSH
+    JMP input_loop
+
+
+% c-sdk {
+static inline void receiver_init(PIO pio, uint sm, uint clk, uint rx) {
+    uint offset = pio_add_program(pio, &receiver_program);
+    pio_sm_config sm_config = receiver_program_get_default_config(offset);
+    pio_sm_claim(pio, sm);
+    
+    sm_config_set_sideset_pins(&sm_config,clk);
+
+    sm_config_set_in_pins(&sm_config,rx);
+    sm_config_set_in_shift(&sm_config,0,0,8);
+    
+    sm_config_set_clkdiv_int_frac (&sm_config, 125, 0);
+    pio_sm_init(pio, sm, offset, &sm_config);
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}
+

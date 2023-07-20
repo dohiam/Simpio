@@ -137,6 +137,7 @@ pio_t * hardware_pio_set();
 sm_t *  hardware_sm_set();
 uint8_t hardware_pio_num_set();
 uint8_t hardware_sm_num_set();
+uint8_t hardware_up_num_set();
 void hardware_set_up(uint8_t pnum, int line);
 user_processor_t* hardware_user_processor_set();
 
@@ -174,5 +175,38 @@ void hardware_init_current_up_pc_if_needed(int8_t first_instruction_location);
 bool hardware_irq_flag_set(uint8_t irq, bool set_or_clear);
 bool hardware_irq_flag_is_set(uint8_t irq);
 
+/************************************************************************************************************************
+ *
+ * HARDWARE DEVICE Functions
+ *
+ * A "device" is a simulated peripheral (attached to GPIO pins)
+ *
+ * A simulated device has:
+ * - an execution handler that is called to simulate an attached peripheral
+ * - an display handler that is called to display the state of the simulated peripheral
+ *
+ * This hardware module is just a container for which devices are enabled and pointers to their handlers.
+ * The execution module will make use of the execution handler and the UI module will use the display handler
+ *
+ * Simulated peripherals (devices) will call the register function to add itself to the list of devices.
+ * The execution and UI modules will use the enumerator functions below to find out what devices are enabled and their handlers.
+ *
+ ************************************************************************************************************************/
+
+#define MAX_DEVICES 5
+
+typedef void (*device_execution_handler_t) ();
+typedef int (*device_display_handler_t) ();
+
+typedef struct {
+    device_execution_handler_t   execution_handler;
+    device_display_handler_t     display_handler;
+    bool                         enabled;
+    char                         name[SYMBOL_MAX];
+} hardware_device_t;
+
+void hardware_register_device(char * name, bool enabled, device_execution_handler_t exec, device_display_handler_t disp);
+
+DEFINE_ENUMERATOR(hardware_device_t, hardware_device_enumerator);
 
 #endif

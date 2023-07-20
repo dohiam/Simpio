@@ -896,6 +896,275 @@ TBD
 
 ### SPI Flash
 
+#### Intro
+
+Note: this example is one of the more complex ones, so one might want to skip through it on a first reading of this document.
+
+"spiflash" is a family of flash memory parts that use the Serial Peripheral Interface discussed earlier (and a registered trademark of its manufacturer - Winbond). These are very commonly used to add storage to microcontrollers and are often referred to by their part numbering pattern - W25QYY, where YY is the number of megabits in the device. There is actually an example showing how to use it with the RP Pico in the [pico-examples repository](https://github.com/raspberrypi/pico-examples).  This example uses the built-in SPI interface capability of the RP Pico, so this example actually doesn't use PIO at all. However, there is a slight issue with this approach which will be discussed as part of this section on building a PIO program to interface with these hardware devices.
+
+Simpio includes a simulated flash memory device which provides a small subset of spiflash commands, allowing one to build and watch the execution of both the PIO program and the simulated flash memory device together, to understand how they interact, while also avoiding the need to buy, integrate, and debug real hardware. However, as with all Simpio examples discussed in this document, the example developed in this section will also run on real hardware, so the transition to real hardware will also be discussed as part of this example.
+
+#### The SDK Example
+
+spi_flash.c is part of the pico-examples repository and is a slightly modified version is included in the test_real folder of the simpio repository. This C program uses the built-in SPI capability of the RP Pico to do a few basic things with a W25QYY memory part:
+
+- get the manufacturer ID if the part
+- erase a section of flash memory
+- write some values to the erased memory section
+- read back the values written
+
+As this is a C program, it can't be run in Simpio, but it could be run on real hardware connected to the right GPIO lines, which in this section are the following (default SPI0 pins):
+
+- sck (aka clock)  => GPIO 18
+- tx (aka MOSI) => GPIO 19
+- rx (aka MISO) => GPIO 16
+- cs (chip select) => GPIO 17
+
+Build and running the program with above connected device will result in the device ID along with the values read back from the device printed to the serial port over the USB connection (after a 5 second delay to allow minicom or equivalent to be started).
+
+#### Replacing Built-In SPI with PIO
+
+Replacing the use of RP Pico's build-in SPI capability with a PIO program involves a sender and a receiver PIO program. The sender outputs 8 bits of each item placed on its RX FIFO, toggling the clock line up and down for each bit sent:
+
+```
+.program sender
+.config pio 0
+.config sm 0
+.config shiftctl_out 0 0 8
+.config side_set_pins 18
+.config out_pins 19 1
+.side_set 1 opt
+
+output_loop:
+    PULL
+    SET X, 7
+outbit:
+    OUT PINS, 1 side 1 [2]
+    JMP X--, outbit side 0 [2]
+    JMP output_loop
+```
+
+Notice that the above shifts to the left. This causes the most significant bit to be sent out first, which is the bit order required for SPI flash. This means that the upper 8 bits will be sent out, so the sender needs to be sure to place the byte to be sent shifted to the left by 24 bits to account for this.
+
+The receiver program is similar in that it inputs 8 bits to the left so that the most significant bit, which is received first, gets shifted to the left 8 bits.
+
+```
+.program receiver
+.config pio 0
+.config sm 1
+.config in_pins 16
+.config shiftctl_in 0 0 8
+.side_set 1 opt
+
+input_loop:
+    PULL
+    SET  X,7
+get_byte:
+    IN  PINS 1 side 1 [2]             ; read input, auto-push at byte
+    JMP X--, get_byte side 0 [2]      ; repeat until all is read 
+    PUSH
+    JMP input_loop
+```
+
+It is important to note the PULL instruction in the receiver program. Normally one would not expect a PULL instruction in a PIO program that does not output data. Its purpose here is to trigger the receiver program to input a byte. Each time an item is placed on this programs TX FIFO, it will input one byte and place it on its RX FIFO. For comparison, it is helpful to consider how other SPI implementations handle input vs output. Some implementations always read and write simultaneously. That is, whenever data is sent to the SPI driver to output, the SPI driver always reads data at the same time it is outputting whatever was sent to it to output. The distinction between reading and writing is thus not in the SPI driver but in the user client program which is calling the SPI driver. When the user client program wants to output data, it sends the data to be output to the SPI driver and ignores the input. Likewise, when the user client program wants to read data, it sends dummy output data to the SPI driver and then reads the input. The peripheral device knows when to pay attention to its input pin and when to ignore it. It is critical that each side, the peripheral device and the master device, both know exactly when they are supposed to be inputting vs outputting. This is stated in the SPI flash datasheet in the form of timing diagrams.
+
+The following is a copy of the timing diagram from the [W25128JV Winbond device](https://www.winbond.com/hq/support/documentation/?__locale=en&line=/product/code-storage-flash-memory/index.html&family=/product/code-storage-flash-memory/serial-nor-flash/index.html&pno=W25Q128JV&category=/.categories/resources/datasheet/) for the read manufacturer id command:
+
+![](spi_flash_read_manufacturer_id.png)
+
+ The way to read the above diagram is in two parts:
+
+1. The first part is the sending of the command and address by the master device to the peripheral and is show by the first set of four "/CS CLK DI DO" lines.
+2. The second part is the sending of the two byte ID by the peripheral device to the master and is shown by the second set of four  "/CS CLK DI DO" lines.
+
+In the first part, note that the DO line is simply marked all the way across as "High Impedance" which just means that the peripheral device is electrically ignoring its DO line because it is only paying attention to its DI line that the command is coming across on. The master device could attempt to read this line but it will just be as though that line wasn't connected to anything. 
+
+In the second part, the DI line has a bunch of "X"s all the way across it. This means that the peripheral device is ignoring the DI line because it is focused on sending the two byte Manufacturer + Device IDs on its DO line during this time. The master device can write anything it likes during this time on the DI line and the peripheral will simply ignore it.
+
+In this example of reading the Manufacturer (and Device) ID, SPI drivers that read and write simultaneously would be used in the following way:
+
+1. Six bytes are written to the SPI driver, but only the first four bytes are meaningful. The last two bytes could be anything.
+2. The last two bytes read from the SPI driver are the only ones meaningful. The first four bytes read (while the command + address are being sent) can just be ignored.
+
+Normally one thinks of "device drivers" as handling all the idiosyncratic details of how to interface to a device but if one tries to think of the SPI driver as being the "device driver", one realizes that much of the burden for understanding the details of each command falls to the user program calling the SPI driver, while the SPI driver itself remains just a very dumb thing that simply "read & write bits" without really understanding anything about what they mean, including which ones are significant and which ones are not.
+
+It actually gets worse because there is one other important signal line in the above timing diagram - the chip select (/CS) line. The master must drive this low to start the process of getting the manufacturer (and device) ID and then drive it high at the end before it can initiate any other action with the SPI flash peripheral. Because the SPI driver doesn't understand anything about commands and responses, it has no way of knowing when to drive this line low and high, so the burden of understanding this also falls to the user program calling the SPI driver. The most problematic part of the user program handling the /CS line is that once it has sent some bytes to the SPI driver, it doesn't have a good way to know when the SPI driver has finished sending or receiving the bytes involved in, for example, getting the manufacturer (and device) ID. All it can do is wait some bit of time and hope that the process has finished and it can then set the /CS line high to end the transaction. For commands that end with reading data, the user program can use the indication that the required number of bytes have been received from the SPI driver as an indication of when the transaction can be concluded by sending the /CS line high, but for other transactions, it can only guess.
+
+#### Moving to a More Complete Transaction Approach
+
+One step toward resolving some of the issues discussed in the previous section is to introduce the notion of a "transaction" which is a complete action of sending a command (and address) along with sending whatever data is associated with that action. For example, the completion action of reading the manufacturer and device ID would be:
+
+1. Set the /CS line low
+2. Send the command byte
+3. Send the 3 bytes of address (which area always zero to read the manufacturer and device ID)
+4. Read the manufacturer ID
+5. Read the device ID
+6. Set the /CS line high
+
+In the tests_real folder of the Simpio repository, there is a "spi_flash_transaction" folder containing a version of the spi_flash.c program from the Pico Examples repository that encapsulates transactions into a single function that takes the following:
+
+- The command byte
+- An indication of whether it should only send the command byte or also send 3 bytes of address
+- Whether it is to read data after the data (and optionally address) are sent
+- How many bytes to read or write after the command (and optionally address) are sent
+
+Given these intputs, the transaction function can perform all six steps in the example of the transaction to read the manufacturer and device id. However, this transaction function, being in the calling C program, rather the the PIO "device driver" still involves some guessing about setting the /CS line high after a transaction has actually been performed with the peripheral device. A better solution would be to have the above transaction functionality inside the PIO program instead of the calling C program.
+
+#### A More Complete PIO Implementation
+
+This section describes an approach to putting the notion of a complete transaction into the PIO program. Currently there are two versions of an example application that uses this approach - one that can be built for real hardware and one that runs on the simulator. The PIO program is the same in both; the difference is that the one for real hardware has a calling program written in C and the one for the simulator uses simple read and write commands since the simulator doesn't support programs witten in C. The "spi_flash_pio" subfolder in the tests_real folder of the Simpio repository has the application for real hardware and the test_spi_flash.simpio file in the tests folder has the one for the simulator.
+
+Before discussing the PIO instructions in this implementation, it is important to understand what it is to accomplish:
+
+- For each transaction it is to perform, it will be given two 32 bit inputs on it RX FIFO. The first 32 bit input is called the "command prefix" and the second is the command+address.
+- In the command prefix, the first most significant bits is a number indicating how many bits are to be sent to the peripheral to start the transaction. As each SPI flash command either involves sending a single byte command or a single byte plus a 3 byte address, this first 6 bits will either be the number 8 or the number 32.
+- The next bit in the command prefix indicates whether to read data after the command (and address) are sent or not. If it is a one, then data is to be read.
+- The next bit is not used.
+- The lower 24 bits of the command prefix are the number of bits to be read or written to the peripheral. If the "read bit" was a one, then this number is the number of bits to read. Otherwise it is the number of bits to write. If it is zero, then no bits are to be read or written.
+- The command+address input has the 8 bit command in the most significant (leftmost) bits and either a 3 byte address in the remaining lower 24 bits or just some dummy bits that will be ignored if only the command bits are to be sent.
+
+The PIO program is to take the above described command prefix & command+address inputs and perform a complete transaction, including setting the /CS line appropriately. One PIO implementation of this looks like the following:
+
+```
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; User program first writes a command prefix;
+; - most significant 6 bits says how many bits are in the command (either 8 or 32)
+; - next bit whether to read (one) or write (zero)
+; - next bit is reserved
+; - lower 24 bits read or write
+;
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.program spi_flash_transaction
+.config pio 0
+.config sm 0
+.config out_pins 19 1
+.config shiftctl_out 0 1 32
+.config in_pins 16
+.config shiftctl_in 0 1 32
+.config side_set_pins 18
+.config side_set_count 1 1 0    ; num_pins=1, optional=1, pindirs=0 
+.config set_pins 17 1
+.device spi_flash 18 19 16 17   ; clk = 18, tx = 19, rx = 16, cs = 17
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; start transaction: get all input
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+start:
+        SET  PINS, 1    [4]         ; CS stays high until transaction starts
+        PULL                        ; when user writes cmd prefix
+        SET  PINS, 0    [4]         ;      then start transaction
+        OUT  X, 6                   ; X <- cmd length in bits (8 or 32)
+        OUT  Y, 1                   ; Y <- read bit
+        OUT  NULL, 1                ; reserved/ignored
+        OUT  ISR, 24                ; ISR <- num bytes to read or write
+        PULL                        ; when user writes cmd (optionally plus address)
+         
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; output the command (+addr)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+outcmd: 
+        JMP X-- outx                ; decrement first so X is num times thru loop
+        JMP start                   ; if zero bits skip
+outx:
+        OUT PINS 1 side 1 [2]       ; send bit with clk high, delay
+        JMP X-- outx side 0 [2]     ; clk low, repeat X times
+        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; write or read ? Set Y to number & reset ISR
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        JMP !Y  not2read            ; if bits to read, input them
+        MOV Y, ISR                  ; Y <- bits to read
+        SET X, 0                    ; clear ISR
+        MOV ISR,X                   ;       and reset it
+        JMP !Y, start               ; if zero bites to read, start again
+        JMP Y--, inbits             ; decrement first so Y is exactly num bits to read
+not2read:
+        MOV Y, ISR                  ; Y <- bits to write
+        SET X, 0                    ; clear ISR
+        MOV ISR,X                   ;       and reset it
+        JMP !Y, start               ;      if bits to write, output them, else go back to start
+        JMP Y--, outbits            ; decrement first so Y is exactly num bits to write
+        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; output Y bits
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+outbits:
+        OUT PINS 1 side 1 [2]       ; send bit with clk high, delay
+        JMP Y-- outbits side 0 [2]  ; repeat for Y bits
+        JMP start                   ; either output or input, never both
+        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; input Y bits
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+inbits:     
+        IN  PINS 1 side 1 [2]       ; read input
+        JMP Y--, inbits side 0 [2]  ; repeat for Y bits
+        PUSH                        ; get any remaining bits not auto-pushed
+        JMP start
+
+;-----------------
+; end of program -
+;-----------------
+```
+
+First note the ".device spi_flash .." command. This enables the simulated SPI flash memory device. The GPIO numbers on this line tell the simulated peripheral which pins it should use for the SPI interface.
+
+This program first pulls the command prefix from the TX FIFO and extracts its individual parts into scratch locations. As no data is being input, the ISR register is used as a scratch register during this part of the PIO program. If, and only if there is data waiting to perform a transaction in the TX FIFO, the program sets the /CS line low.
+
+Next, this program writes the command or command+address, depending on how many bits it was told to send.
+
+Next, this program checks to see if it should receive or send data. As no transaction involves both sending and receiving additional data (only one or the other), after it has sent or received the additional number of bits, the program ends the transaction by setting the /CS line high and waits to for another transaction indication on the TX FIFO. 
+
+An important detail of this program is the pulling and pushing of additional bits/bytes to send or receive. In this program, autopull is set up for 32 bits, so the calling program needs to send enough full 32 bit values to send the number of bits it told the PIO program to send. The last 32 bit value sent by the calling program into the TX FIFO needs to have the bits to be sent in the leftmost (most significant) locations. In addition to simplicity of implementation, this approach of sending full 32 bit values (groups of 4 bytes at a time) takes more advantage of the space in the FIFOs, but it does create a "leftover bits" type of annoyance, depending on if the number of bytes to be sent or received is, or is not, a multiple of 4. In the case of sending, the calling program just needs to be careful to pack the 32 bit values with bytes appropriately. However, in the case of receiving bytes, in addition to taking care to unpack them appropriately, the calling program has to deal with an additional value in the RX FIFO with "any remaining bits not a multiple of 32". Specifically, in the case when there are exactly a multiple of 32 bits to be received, an additional "empty" or "dummy" value will be in the RX FIFO that needs to be read and ignored. The logic to figure out in the PIO program whether to perform this "final push" of leftover bits would be very simple if there were an instruction that would push only if the ISR was not empty, but unfortunately there is no such instruction, so the logic to figure out this final push would be significant inside the PIO program. Alas, the program as it is, barely fits within the 32 instruction limit for PIO programs, so there is no room for such additional logic. This program could be spread across both PIOs to avoid this problem; such an implementation is left as an exercise for the reader (didn't one know that there had to be at least one of these exercises for the reader someone in here somewhere?).
+
+A user program for this, which can be run in the Simpio simulator is:
+
+```
+.config user_processor 0
+.config user_var A
+.config user_var B
+        WRITE 0x82000010    ; 1000 0010 ... 0010 = (32 bits) + 10 (read) + (16 bits)
+        WRITE 0x90000000    ; 0x90 (cmd - read manufacturer id) = zero address
+        READ  A
+        WRITE 0x40000000    ; 00100 00 .. 00 = 001000 (8 bits)
+        WRITE 0x06000000    ; 0x06 (cmd - write enable)
+        WRITE 0x82000000    ; 1000 0010 ... 0010 = (32 bits) + 00 (no read) + (0 bytes) 
+        WRITE 0x20000000    ; 0x20 (cmd - erase sector) + zero address
+        WRITE 0x82000020    ; cmd + address + read + 4 bytes (32 bits)
+        WRITE 0x03000000    ; 0x03 (cmd - read) + zero address
+        READ  A             ; should be all ff
+        READ  B             ; dummy read because bits to read was exact multiple of 32
+        WRITE 0x40000000    ; 00100 00 .. 00 = 001000 (8 bits)
+        WRITE 0x06000000    ; 0x06 (cmd - write enable)
+        WRITE 0x80000020    ; cmd + address + not-read + 4 bytes (32 bits)
+        WRITE 0x02000000    ; 0x02 (cmd - write) + zero address
+        WRITE 0xABCDEF12    ; 3 bytes of data
+        WRITE 0x82000020    ; cmd + address + read + 4 bytes (32 bits)
+        WRITE 0x03000000    ; 0x03 (cmd - read) + zero address
+        READ  A             ; should be ABCDEF12
+        EXIT
+```
+
+This program is fairly cryptic, as the commands and command prefixes are all in hex values. The C program is much less cryptic, taking advantage of logic in C to pack and unpack things. However, both the above and the C program:
+
+- Read the manufacturer and device ID
+- Erase a section of flash memory & verify that it contains all FFs.
+- Write some values to flash memory
+- Read back the values written
+
+#### Watching SPI Flash Work in Simpio
+
+The above user and PIO program can be observed in the Simpio simulator, but single stepping through the entire operation would be time consuming and tedious as it takes several thousand steps to complete everything. Judicious use of breakpoints is much more efficient. The following are some suggestions:
+
+- Set breakpoints just after each READ instruction in the user program to observer in the top right window what was just read.
+- Set a breakpoint at the first pull instruction and then single step through the following instructions to see how things are unpacked.
+- Set a breakpoint at first instruction to set /CS high (which ends each transaction). When this breakpoint is hit, press the PF12 key to get the additional features menu of Simpio. This menu will list the current active devices. Selecting the value for the SPI flash device will show the status of the SPI flash simulated peripheral. On can see the command that was just received, the value of the first few bytes of memory, and other status information. Once can also access this information in the same way at any time to observer the process of receiving and sending bits by the SPI flash peripheral.
+- From the same PF12 special features menu, one could press the "f" key to see the complete contents of all the FIFOs to see what is queued up from and to the user program.
+
+### DHT11 Temp Sensor - Input Based on Timing
+
 TBD
 
 ### Parallel LCD

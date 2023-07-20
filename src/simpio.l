@@ -49,6 +49,8 @@ int temp_i;
 
 x--                      { return _X_DECREMENT; }
 y--                      { return _Y_DECREMENT; }
+!x                       { return _NOT_X; }
+!y                       { return _NOT_Y; }
 x!=y                     { return _X_NOT_EQUAL_Y; }
 pin                      { return _PIN; }
 !osre                    { return _NOT_OSRE; }
@@ -85,6 +87,8 @@ noblock                  { return _NOBLOCK; }
 \.lang_opt               { PRINTD("lang_opt statement\n"); return _LANG_OPT; }
 \.word                   { PRINTD("word statement\n"); return _WORD; }
 \.data                   { PRINTD("data statement\n"); return _DATA_CONFIG; }
+\.device                 { PRINTD("device statement\n"); return _DEVICE; }
+spi_flash                { PRINTD("spi flash device\n"); return _SPI_FLASH; }
 
 \.config                 { PRINTD("config statement\n"); return _CONFIG; }
 pio                      { return _PIO; }

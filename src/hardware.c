@@ -289,6 +289,8 @@ void hardware_fifo_merge(fifo_mode_t mode) {
 
 uint8_t hardware_pio_num_set() { return current_pio; }
 uint8_t hardware_sm_num_set() { return current_sm; }
+uint8_t hardware_up_num_set() { return current_up; }
+
 
 pio_t * hardware_pio_set() {return &(pios[current_pio]);}
 sm_t *  hardware_sm_set()  {return &(sms[current_sm]);}
@@ -304,3 +306,21 @@ bool hardware_irq_flag_is_set(uint8_t irq) {
     else return false;
 }
 
+/************************************************************************************************
+  devices simulated 
+ ************************************************************************************************/
+
+hardware_device_t hardware_devices[MAX_DEVICES];
+static int last_device = -1;
+
+void hardware_register_device(char * name, bool enabled, device_execution_handler_t exec, device_display_handler_t disp) {
+    if (++last_device == MAX_DEVICES) return;
+    strncpy(hardware_devices[last_device].name, name, SYMBOL_MAX);
+    hardware_devices[last_device].enabled = enabled;
+    hardware_devices[last_device].execution_handler = exec;
+    hardware_devices[last_device].display_handler = disp;
+    PRINTI("device %s registered\n", name);
+}
+
+IMPLEMENT_ENUMERATOR(hardware_device_t, hardware_device_enumerator, hardware_devices, MAX_DEVICES)
+    

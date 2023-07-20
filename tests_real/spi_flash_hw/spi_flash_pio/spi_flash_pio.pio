@@ -1,0 +1,118 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; User program first writes a command prefix;
+; - most significant 6 bits says how many bits are in the command (typically either 8 or 32)
+; - next bit whether to read (one) or write (zero)
+; - next bit is reserved
+; - lower 24 bits read or write
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+.program spi_flash_transaction
+.side_set 1 opt
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; start transaction: get all input
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+start:
+        SET  PINS, 1    [4]         ; CS stays high until transaction starts
+        PULL                        ; when user writes cmd prefix
+        SET  PINS, 0    [4]         ;      then start transaction
+        OUT  X, 6                   ; X <- cmd length in bits (8 or 32)
+        OUT  Y, 1                   ; Y <- read bit
+        OUT  NULL, 1                ; reserved/ignored
+        OUT  ISR, 24                ; ISR <- num bytes to read or write
+        PULL                        ; when user writes cmd 
+        
+        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; output the command (+addr)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+outcmd: 
+        JMP X-- outx                ; decrement first so X is num times thru loop
+        JMP start                   ; if zero bits skip
+outx:
+        OUT PINS 1 side 1 [2]       ; send bit with clk high, delay
+        JMP X-- outx side 0 [2]     ; clk low, repeat X times
+        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; write or read ? Set Y to number & reset ISR
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        JMP !Y  not2read            ; if bits to read, input them
+        MOV Y, ISR                  ; Y <- bits to read
+        SET X, 0                    ; clear ISR
+        MOV ISR,X                   ;       and reset it
+        JMP !Y, start               ; if zero bites to read, start again
+        JMP Y--, inbits             ; decrement first so Y is exactly num bits to read
+not2read:
+        MOV Y, ISR                  ; Y <- bits to write
+        SET X, 0                    ; clear ISR
+        MOV ISR,X                   ;       and reset it
+        JMP !Y, start               ;      if bits to write, output them, else go back to start
+        JMP Y--, outbits            ; decrement first so Y is exactly num bits to write
+        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; output Y bits
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+outbits:
+        OUT PINS 1 side 1 [2]       ; send bit with clk high, delay
+        JMP Y-- outbits side 0 [2]  ; repeat for Y bits
+        JMP start                   ; either output or input, never both
+        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; input Y bits
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+inbits:     
+        IN  PINS 1 side 1 [2]       ; read input, auto-push at byte
+        JMP Y--, inbits side 0 [2]  ; repeat for Y bits
+        PUSH                        ; get any remaining bits not auto-pushed
+        JMP start
+
+;-----------------
+; end of program -
+;-----------------
+
+% c-sdk {
+static inline void spi_flash_transaction_init(PIO pio, uint8_t sm, uint8_t clk, uint8_t tx, uint8_t rx, uint8_t cs) {
+    uint offset = pio_add_program(pio, &spi_flash_transaction_program);
+    pio_sm_config sm_config = spi_flash_transaction_program_get_default_config(offset);
+    
+    pio_sm_claim(pio, sm);
+    
+    sm_config_set_sideset_pins(&sm_config,clk);
+    pio_sm_set_consecutive_pindirs(pio, sm, clk, 1, true);
+    pio_gpio_init(pio, clk); 
+    
+    sm_config_set_set_pins(&sm_config,cs,1);
+    pio_sm_set_consecutive_pindirs(pio, sm, cs, 1, true);
+    pio_gpio_init(pio, cs); 
+    
+    sm_config_set_in_pins(&sm_config,rx);
+    sm_config_set_in_shift(&sm_config,0,1,32);
+    
+    sm_config_set_out_pins(&sm_config,tx,1);
+    pio_sm_set_consecutive_pindirs(pio, sm, tx, 1, true);
+    pio_gpio_init(pio, tx); 
+    sm_config_set_out_shift(&sm_config,0,1,32);    
+    
+    sm_config_set_clkdiv_int_frac (&sm_config, 125, 0);
+    pio_sm_init(pio, sm, offset, &sm_config);
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}
+
+.program probe
+
+    SET  X 1
+    MOV  ISR, X
+    WAIT 1 PIN 0
+    PUSH
+    SET  X 0
+    MOV  ISR, X
+    WAIT 0 PIN 0
+    PUSH
+
+
+
+

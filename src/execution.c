@@ -573,6 +573,13 @@ bool try_sm(instruction_t ** instr) {
  * execution 
  **********************************************************************************************************/
 
+static void run_each_enabled_device() {
+    PRINTD("running device handlers\n");
+    FOR_ENUMERATION(device, hardware_device_t, hardware_device_enumerator) {
+        if (device->enabled) (*device->execution_handler)();
+    }    
+}
+
 int exec_step_programs_next_instruction() {
     static user_instruction_t* user_instruction = NULL;
     static instruction_t* instruction = NULL;
@@ -623,6 +630,7 @@ int exec_step_programs_next_instruction() {
         PRINTD("Trying SM first: delay:%d delay_left:%d\n", instruction->delay, instruction->delay_left); 
         try_user_first = true;
         completed = exec_run_instruction(instruction);
+        run_each_enabled_device();
         if (SIMULATION_EXITED) return last_line;
         sm = (sm_t *) instruction->executing_sm;
         sm->clock_tick++;
@@ -684,10 +692,10 @@ bool run_jmp_instruction(instruction_t * instruction) {
             if (sm->scratch_y == 0) branch = true;
             break;
         case x_decrement:
-            if (--(sm->scratch_x) != 0) branch = true;
+            if ((sm->scratch_x)-- != 0) branch = true;
             break;
         case y_decrement:
-            if (--(sm->scratch_y) != 0) branch = true;
+            if ((sm->scratch_y)-- != 0) branch = true;
             break;
         case x_not_equal_y:
             if (sm->scratch_x != sm->scratch_y) branch = true;

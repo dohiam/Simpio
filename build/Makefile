@@ -1,7 +1,7 @@
 SRC = ../src
 INC = ../inc
 
-HEADERS = ${INC}/editor.h ${INC}/enumerator.h ${INC}/execution.h ${INC}/fifo.h ${INC}/hardware.h ${INC}/hardware_changed.h ${INC}/instruction.h ${INC}/parser.h ${INC}/print.h ${INC}/ui.h
+HEADERS = ${INC}/editor.h ${INC}/enumerator.h ${INC}/execution.h ${INC}/fifo.h ${INC}/hardware.h ${INC}/hardware_changed.h ${INC}/instruction.h ${INC}/parser.h ${INC}/print.h ${INC}/ui.h ${INC}/devices.h
 
 # no debug info (note: debug info left on yacc to assist user in debugging syntax issues)
 CC = gcc -I ${INC} -Werror 
@@ -21,12 +21,12 @@ LIB =  -l:libncursesw.a -l:libtinfo.a
 #LIB =  -lncurses -ll  -lgcov
 
  
-simpio: main.o execution.o instruction.o hardware.o fifo.o hardware_changed.o editor.o ui.o print.o parser.o lexer.o symbols.o
-	${LD} main.o execution.o instruction.o hardware.o fifo.o hardware_changed.o editor.o ui.o print.o parser.o lexer.o -o simpio symbols.o ${LIB} 
+simpio: main.o execution.o instruction.o hardware.o fifo.o hardware_changed.o editor.o ui.o print.o parser.o lexer.o symbols.o devices.o
+	${LD} main.o execution.o instruction.o hardware.o fifo.o hardware_changed.o editor.o ui.o print.o parser.o lexer.o -o simpio symbols.o devices.o ${LIB} 
 	cp simpio ../tests/simpio
     
-fifo_test: ${SRC}/fifo_test.c ${INC}/fifo.h fifo.o
-	${CC} ${SRC}/fifo_test.c fifo.o -o fifo_test
+devices.o: ${SRC}/devices.c ${HEADERS}
+	${CC} -c ${SRC}/devices.c -o devices.o
 
 symbols.o: ${SRC}/symbols.c ${INC}/symbols.h
 	${CC} -c ${SRC}/symbols.c -o symbols.o
@@ -45,6 +45,9 @@ hardware.o: ${SRC}/hardware.c ${HEADERS}
 
 hardware_changed.o: ${SRC}/hardware_changed.c ${HEADERS}
 	${CC} -c ${SRC}/hardware_changed.c -o hardware_changed.o
+
+fifo_test: ${SRC}/fifo_test.c ${INC}/fifo.h fifo.o
+	${CC} ${SRC}/fifo_test.c fifo.o -o fifo_test
 
 fifo.o: ${SRC}/fifo.c ${HEADERS} 
 	${CC} -c ${SRC}/fifo.c -o fifo.o
@@ -71,7 +74,7 @@ y.tab.c: ${SRC}/simpio.y ${HEADERS}
 	${YACC} ${SRC}/simpio.y
     
 clean:  
-	rm -f lex.yy.c y.tab.c y.tab.h y.output ui.o editor.o hardware.o instruction.o execution.o hardware_changed.o lexer.o parser.o fifo.o print.o main.o simpio
+	rm -f lex.yy.c y.tab.c y.tab.h y.output ui.o editor.o hardware.o instruction.o execution.o hardware_changed.o lexer.o parser.o fifo.o print.o symbols.o devices.o main.o simpio
 	rm -f *.gcno
 	rm -f *.gcda
 	rm -f *.gcov

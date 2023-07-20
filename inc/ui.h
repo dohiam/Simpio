@@ -59,7 +59,7 @@ typedef int  (*run_execute_t)();                  /* returns line number the pro
 typedef int  (*save_pgm_t)(char *pio_pgm);        /* returns 1 if saved successfully, 0 if there was an error */
 typedef void (*get_timeline_params_t) ();         /* sets timeline paramters that can be retrieved later separate accessor functions */
 typedef void (*show_timeline_t) ();               /* function to show the timeline window (using provided ui drawing functions */
-typedef void (*show_fifos_t) ();                  /* function to show contents of the fifos */
+typedef int  (*temp_window_handler_t) ();         /* function to handle all the misc features handled via the temp window */
 
 typedef struct {
     build_compile_t        build_compile_function;
@@ -69,7 +69,7 @@ typedef struct {
     save_pgm_t             save_function;
     get_timeline_params_t  get_timeline_params_function;
     show_timeline_t        show_timeline_function;
-    show_fifos_t           show_fifos;
+    temp_window_handler_t  temp_window_handler;
     char * filename;
 } ui_user_functions_t;
 
@@ -134,6 +134,7 @@ extern WINDOW *temp_window;
 void ui_temp_window_open();
 #define ui_temp_window_write(...) wprintw(temp_window, __VA_ARGS__); wrefresh(temp_window)
 #define ui_temp_window_getch() wgetch(temp_window)
+void ui_temp_window_clear();
 void ui_temp_window_close();
 
 
