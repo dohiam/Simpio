@@ -52,6 +52,10 @@ In summary (as a quick reference):
 - PF8 to select GPIOs to display a timeline for.
 - PF9 to display a timeline.
 
+## Linux Windows Mac OS X
+
+Simpio is a Linux command line application but runs well under Windows Subsystem for Linux on Windows 10 and Windows 11. It is expected to also run under [multipass](https://multipass.run/docs/installing-on-macos) on Mac OS X. (If there is interest in a native Mac OS version, please contact the Simpio author.)
+
 ## Simpio Options
 
 There are a few command line options for other ways to use Simpio. The options are best explained by looking at why one would want to use them.
@@ -894,6 +898,61 @@ One could also step through this overall program, one instruction at a time, to 
 
 TBD
 
+### Keypad
+
+A typical keypad is a matrix of switch that connect "row" pins to "column" pins:
+
+![](keypad_schematic.png)
+
+https://www.circuitbasics.com/how-to-set-up-a-keypad-on-an-arduino/
+
+When a key is pressed, a circuit between a row and column pin is completed. This can be used to determine which, if any, single key is pressed using the following approach:
+
+1. Configure each row pin as an output pin
+2. Configure each column pin as an input pin such that if not driven high, then it will be low. 
+   (This is the default behavior when configuring pins as inputs on the Pico.)
+3. Set one row to high
+4. Sample each column pin one at a time, looking for an column pin that is driven high. Any column pin that is high will have been driven high by the row pin driving it through the closed switch, so that column and the row must be connected to the same switch
+5. Repeat for each row
+
+So for example, if the "6" key is pressed, it will create a connection between the R2 row and the C3 column so when R2 is driven high, C3 will also be high, but everything else will still be low.
+
+This can be done using a PIO program using the following approach:
+
+1. Write a 1 to the row pins to drive the first row high and the rest low
+2. Write a 2 to drive the second row pin high and the rest low
+3. Write a 4 to drive the third row pin high and the rest low
+4. Write an 8 to drive the fourth row pin high and the rest low
+5. Reading a 1 from the column pins means the first column is high and the rest are low
+6. Reading a 2 from the column pins means the second column is high and the rest are low
+
+The key (and pretty nifty) thing is that the switch pressed can be completely determined by the value written and the value read. Writing a 2 and reading a 4 would mean that the "6" key was pressed, for example.
+
+The following fragment of PIO code shows how this can be done:
+
+```
+        SET     X, 1
+        MOV     OSR, X
+        OUT     PINS, 4
+        IN      PINS, 4
+        MOV     Y, ISR
+        JMP     Y--, send_press
+```
+
+Unfortunately, a 1 can't be written directly. To write a 1 to the 4 output row pins, one needs to set that value in the X scratch register & move this into the OSR before it can be output. Similarly and unfortunately, there is no JMP condition based on the value of the ISR, so the vale read needs to first be moved into the Y scratch register where it can be tested and if not zero, the a JMP made to "send_press" which will note the row and column values:
+
+```
+send_press:
+        PUSH                    ; col val
+        MOV     ISR, X          ; row val
+        PUSH
+        JMP     start
+```
+
+The column value read will still be in the ISR, so it can be pushed to the RX FIFO where it can be read by a user program. Then the row value which is still in the X register can be moved into the ISR where it can also be pushed out. This results in the column value, then row value, being readable by a user program to determine which button was pressed.
+
+A user program could periodically check ("poll") the RX FIFO to see if any button has been pressed. A somewhat better approach of using an interrupt handler will be discussed in the Advanced Topics section on Interrupts (so the complete program for this example is contained there).
+
 ### SPI Flash
 
 #### Intro
@@ -1177,7 +1236,74 @@ TBD: Keeping PIN/GPIO naming straight, summary of instructions and major functio
 
 TBD: Discussion of DMA
 
+### Advanced Topic: Interrupts
 
+The keypad example discussed earlier left with requiring the user program to poll the RX FIFO to see if there were any keystrokes recorded in it. A somewhat better approach is to generate a hardware interrupt when a keystroke is detected, freeing the user program from having to constant poll, or simply blocking execution, waiting on a column & row pair to show up in the FIFO:
+
+```
+.config user_processor 0
+.config user_var A
+.config user_var B
+        READ    A
+        READ    B
+```
+
+ Generating an interrupt handler in Simpio is deceptively easy:
+
+```
+.config interrupt_handler 0 
+.config interrupt_source 0 0 0
+.config user_var A
+.config user_var B
+        READ    A
+        READ    B
+```
+
+The only difference is changing from user_processor 0 to interrupt_handler 0, and adding an interrupt source. In addition to two user processors, Simpio provides two interrupt handler processors that can run user program statements that a user processor can in Simpio.
+
+Triggering the interrupt handler from PIO code involves the use of IRQ flags:
+
+```
+        IRQ     0
+        IRQ     CLEAR 0
+```
+
+Setting IRQ 0 causes the interrupt handler to run, and clearing IRQ 0 prevents it from running over and over, unless another key is detected.
+
+The interrupt source statement is what ties together the interrupt handler and the IRQ flag:
+
+```
+.config interrupt_source 0 0 0
+```
+
+This statement says to use IRQ flag 0 from PIO 0's IRQ 0 (which is why there are three zeros in the statement). Actually, the second two zeros are irrelevant in Simpio because it triggers the handler directly from the flag, not using the PIO IRQ at all. However, the statement with all three zeros provides a way to generate code that can run in real Pico hardware.
+
+In real Pico hardware, there are three different pieces involved in generating an interrupt from PIO code:
+
+1. The interrupt hardware that is part of the ARM processor that runs the actual interrupt handler code.
+2. The IRQ hardware that is part of the PIO hardware block.
+3. The IRQ flags shared among PIO State Machines
+
+Essentially, the ARM processor hardware is mapped to the PIO IRQ and the PIO IRQ is mapped to an IRQ flag that can actually be raised by a state machine using a PIO instruction. Each mapping and hardware piece will be discussed in more detail below.
+
+1. The ARM processor interrupt hardware can be used to generate interrupts from many difference sources, not just PIO. Telling it which source to use involves providing it an interrupt source number. Four of the defined interrupt source numbers are tied to PIO. There is one for PIO 0 IRQ 0, another for PIO 0 IRQ 1, a third for PIO 1 IRQ 0 and a fourth for PIO 1 IRQ 1.
+2. There are 8 IRQ flags shared across all the PIO State Machines. These can be used for general communication/coordination between PIO programs that are running at the same time. However, the first 4 IRQ flags (0 ..3) can also be mapped to any of the four PIO IRQs.
+
+When all three pieces are mapped together, setting an IRQ flag causes the associated PIO IRQ to be raised, and raising a PIO IRQ triggers the ARM processor interrupt. In C code, the mapping looks like:
+
+```
+    pio_set_irq0_source_enabled(pio0, pis_interrupt0, true);
+    irq_set_exclusive_handler(PIO0_IRQ_0, &irq_handler);
+    irq_set_enabled(PIO0_IRQ_0, true);
+```
+
+The first statement says to map IRQ0 of PIO 0 to IRQ flag 0 (pis_interrupt0). The second statement says to map PIO 0 IRQ 0 to the ARM processor. The last statement just says to enable the mapped interrupt. A somewhat unfortunate logistical burden is created by having the three different pieces indicated differently. The IRQ number is embedded in the function name. The IRQ flag name is embedded in a constant. And the PIO and IRQ are embedded in a different constant. To unravel this, a helper function is used when code for real hardware is generated from a simpio program:
+
+```
+map_irq_flag_to_irq_and_enable_interrupt_handler(flag, pio, irq, (*irq_handler)() );
+```
+
+In this function call, the irq_handler is always the function name that is generated that contains the user program from the simpio program. The other three arguments are exactly the same as in the interrupt source statement. So in the code generated by the generate.py script, interrupt source statements are changed into calls to the map_irq_flag_to_irq_and_enable_interrupt_handler function; this function can also be used in any hand created program using PIO generated interrupts too.
 
 ## Part 7 - Moving to Real Hardware
 
@@ -1315,6 +1441,15 @@ A 5 second delay is added to the start of the first user program and before the 
 In addition to supporting multiple PIO/SM programs, Simpio supports two user programs; these are mapped to the two ARM processors on real Pico hardware. The generate.py outputs C code that sets up the first user program running on user processor 0 to the main ARM processor and the second user program running on user processor 1 to the second ARM processor. In this way, both user programs can run the same way in both the Simulator and on real Pico hardware. 
 
 See the parallel and serial examples in the tests_real directory for examples.
+
+#### Interrupt Support
+
+As described in the advanced topic on interrupts, the generate.py script will generate an interrupt handler and code to create the required mappings to trigger this handler from an IRQ flag. It does this based on the following statements from a Simpio program:
+
+```
+.config interrupt_handler 0 
+.config interrupt_source 0 0 0
+```
 
 #### DMA Support
 

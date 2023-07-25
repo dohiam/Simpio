@@ -12,6 +12,10 @@
 
 #include "hardware.h"
 
+typedef enum {exec_normal, exec_interrupt, exec_idle } exec_context_e;
+
+void exec_reset();
+
 int8_t exec_first_instruction_that_will_be_executed();
 
 int  exec_step_programs_next_instruction();  

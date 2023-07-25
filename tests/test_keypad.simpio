@@ -1,0 +1,63 @@
+
+; rows are output pins, cols are input pins
+; send 1,2,4,8 to set each row high one at a time
+; read cols and if any are high, output both col and row values
+
+.program keys
+.config pio 0
+.config sm 0
+.config out_pins 2 4
+.config shiftctl_out 1 0 32
+.config in_pins 6
+.config shiftctl_in 0 0 32
+.device keypad 2 3 4 5 6 7 8 9
+
+start:
+        IRQ     CLEAR 0
+        SET     X, 1
+        MOV     OSR, X
+        OUT     PINS, 4
+        IN      PINS, 4
+        MOV     Y, ISR
+        JMP     Y--, send_press
+        SET     X, 2
+        MOV     OSR, X
+        OUT     PINS, 4
+        IN      PINS, 4
+        MOV     Y, ISR
+        JMP     Y--, send_press
+        SET     X, 4
+        MOV     OSR, X
+        OUT     PINS, 4
+        IN      PINS, 4
+        MOV     Y, ISR
+        JMP     Y--, send_press
+        SET     X, 8
+        MOV     OSR, X
+        OUT     PINS, 4
+        IN      PINS, 4
+        MOV     Y, ISR
+        JMP     Y--, send_press
+        JMP     start
+        
+        
+send_press:
+        PUSH                    ; 2^col 
+        MOV     ISR, X          ; 2^row 
+        PUSH
+        IRQ     0
+        IRQ     CLEAR 0
+        JMP     start
+        
+
+.config interrupt_handler 0 
+.config interrupt_source 0 0 0
+
+.config user_var A
+.config user_var B
+.config user_var C
+.config user_var D
+
+        READ    A
+        READ    B
+                

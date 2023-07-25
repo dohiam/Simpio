@@ -48,6 +48,7 @@ void system_init() {
     line_count = 0;
     instruction_set_defaults(&ci);
     hardware_set_system_defaults();  
+    exec_reset();
 }
 
 int simpio_parse(char * pio_file_name)
@@ -121,9 +122,9 @@ int simpio_test_build(int argc, char** argv)
 %token _AUTOPUSH _AUTOPULL
 %token _BANG _COLON _COLON_COLON
 
-%token _CONFIG _PIO _SM _PIN_CONDITION _SET_PINS _IN_PINS _OUT_PINS _SIDE_SET_PINS _SIDE_SET_COUNT _USER_PROCESSOR _FIFO_MERGE _CLKDIV _DATA_CONFIG _SERIAL _USB _RS232
-%token _SHIFTCTL_OUT _SHIFTCTL_IN 
-%token _DEVICE _SPI_FLASH
+%token _CONFIG _PIO _SM _PIN_CONDITION _SET_PINS _IN_PINS _OUT_PINS _SIDE_SET_PINS _SIDE_SET_COUNT _USER_PROCESSOR  _INTERRUPT_HANDLER _INTERRUPT_SOURCE
+%token _SHIFTCTL_OUT _SHIFTCTL_IN _FIFO_MERGE _CLKDIV _DATA_CONFIG _SERIAL _USB _RS232
+%token _DEVICE _SPI_FLASH _KEYPAD
 
 %token <ival> _BINARY_DIGIT _HEX_NUMBER _BINARY_NUMBER _DECIMAL_NUMBER _DELAY
 %token <sval> _SYMBOL 
@@ -168,6 +169,8 @@ config_statement: _PIO number { hardware_set_pio($2, line_count); } | _SM number
                   _SHIFTCTL_IN number number number { hardware_set_shiftctl_in($2, $3, $4, line_count); } |
                   _EXECCTRL_STATUS_SEL number number {hardware_set_status_sel($2, $3); } |
                   _USER_PROCESSOR number{hardware_set_up($2, line_count);} |
+                  _INTERRUPT_HANDLER number{hardware_set_ih($2, line_count);} |
+                  _INTERRUPT_SOURCE number number number {hardware_enable_irq_handler($2, $3, $4, line_count);} |
                   _FIFO_MERGE number { hardware_fifo_merge($2); } |
                   _VAR _SYMBOL { instruction_var_define($2); } |
                   _SERIAL _RS232 | _SERIAL _USB |
@@ -189,7 +192,8 @@ lang_opt_directive: _LANG_OPT _SYMBOL  { /* todo */ }
 
 word_directive:  _WORD expression { /* todo */ }
 
-device_directive: _DEVICE _SPI_FLASH number number number number { devices_enable_spi_flash($3, $4, $5, $6); }
+device_directive: _DEVICE _SPI_FLASH number number number number { devices_enable_spi_flash($3, $4, $5, $6); } |
+                  _DEVICE _KEYPAD number number number number number number number number { devices_enable_keypad($3, $4, $5, $6, $7, $8, $9, $10); }
 
 /****************************************************************************************************************
  * instructions: 
@@ -254,7 +258,7 @@ operation: /* empty */ { ci.operation = no_operation; } | _BANG { ci.operation =
 
 irq_instruction: _IRQ irq_operation number relative { ci.instruction_type = irq_instruction; ci.index_or_value = $3; } 
 
-irq_operation: /* empty */ | _SET { ci.operation = set_operation; } | _NOWAIT { ci.operation = nowait_operation; } | _WAIT { ci.operation = wait_operation; } | _CLEAR { ci.operation = clear_operation; } ;
+irq_operation: /* empty */ { ci.operation = nowait_operation; } | _SET { ci.operation = nowait_operation; } | _NOWAIT { ci.operation = nowait_operation; } | _WAIT { ci.operation = wait_operation; } | _CLEAR { ci.operation = clear_operation; } ;
 
 set_instruction: _SET  destination expression { ci.instruction_type = set_instruction; ci.index_or_value = $3; } ;
 

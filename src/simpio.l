@@ -89,6 +89,7 @@ noblock                  { return _NOBLOCK; }
 \.data                   { PRINTD("data statement\n"); return _DATA_CONFIG; }
 \.device                 { PRINTD("device statement\n"); return _DEVICE; }
 spi_flash                { PRINTD("spi flash device\n"); return _SPI_FLASH; }
+keypad                   { PRINTD("keypad device\n"); return _KEYPAD; }
 
 \.config                 { PRINTD("config statement\n"); return _CONFIG; }
 pio                      { return _PIO; }
@@ -105,6 +106,8 @@ execctrl_status_sel      { return _EXECCTRL_STATUS_SEL; }
 tx_level                 { return _TX_LEVEL; }
 rx_level                 { return _RX_LEVEL; }
 user_processor           { return _USER_PROCESSOR; }
+interrupt_handler        { return _INTERRUPT_HANDLER; }
+interrupt_source         { return _INTERRUPT_SOURCE; }
 fifo_merge               { return _FIFO_MERGE; }
 clkdiv                   { return _CLKDIV; }
 serial                   { return _SERIAL; }

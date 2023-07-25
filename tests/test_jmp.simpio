@@ -48,7 +48,8 @@ countdowny:
 test6:
     SET X 2
     JMP X!=Y wrong
-    
+
+.config user_processor 0
     WRITE 15         ; load 1111 into OSR (note that pull_thresh is set to 4)
     PULL noblock
 test7:

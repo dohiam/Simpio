@@ -24,6 +24,7 @@
 // number of SMs *per PIO*
 #define NUM_SMS                4
 #define NUM_USER_PROCESSORS    2
+#define NUM_IH_PROCESSORS      2
 #define NUM_GPIOS             32
 #define NUM_IRQS               2
 #define NUM_IRQ_FLAGS          8
@@ -32,6 +33,9 @@
 #define STATUS_ALL_ZEROS 0
 
 typedef enum {tx_level, rx_level, unconfigured_level} status_level_e;
+typedef enum { up_context, ih_context } user_instruction_context_e;
+
+user_instruction_context_e hardware_get_user_instruction_context();
 
 typedef struct {
     bool value;
@@ -39,8 +43,10 @@ typedef struct {
 } gpio_t;
 
 typedef struct {
-    bool value;
-} irq_t;
+    bool enabled;
+    bool set;
+    uint8_t flag;
+} hardware_irq_t;
 
 typedef struct {
     /* SM 'hardware' */
@@ -88,7 +94,7 @@ typedef struct {
 
 /* There are two pios, each with 2 irqs, 4 state machines, and instruction memory that is not currently modeled */
 typedef struct {
-    irq_t irqs[NUM_IRQS];
+    hardware_irq_t irqs[NUM_IRQS];
     instruction_t instructions[NUM_INSTRUCTIONS];
     int8_t  next_instruction_location; /* address of next place in pio program memory where an instruction can be added */
     uint8_t this_num;
@@ -103,11 +109,20 @@ typedef struct {
 } user_processor_t;
 
 typedef struct {
+    user_instruction_t instructions[NUM_USER_INSTRUCTIONS];
+    int8_t  next_instruction_location; 
+    int8_t  pc; /* user program counter */
+    uint8_t this_num;
+    char    data[STRING_MAX];
+    bool    enabled;
+} ih_processor_t;
+
+typedef struct {
     bool    set; 
     bool    mapped_to_irq;
     uint8_t pio;
-    uint8_t pio_num;
-} irq_flags_t;
+    ih_processor_t * ih;
+} hardware_irq_flag_t;
 
 
 /************************************************************************************************************************
@@ -138,12 +153,17 @@ sm_t *  hardware_sm_set();
 uint8_t hardware_pio_num_set();
 uint8_t hardware_sm_num_set();
 uint8_t hardware_up_num_set();
+uint8_t hardware_ih_num_set();
 void hardware_set_up(uint8_t pnum, int line);
 user_processor_t* hardware_user_processor_set();
+void hardware_set_ih(uint8_t pnum, int line);
+ih_processor_t* hardware_ih_processor_set();
 
 DEFINE_ENUMERATOR(pio_t, hardware_pio)
 DEFINE_ENUMERATOR(sm_t, hardware_sm)
 DEFINE_ENUMERATOR(user_processor_t, hardware_user_processor)
+DEFINE_ENUMERATOR(ih_processor_t, hardware_ih_processor)
+DEFINE_ENUMERATOR(hardware_irq_flag_t, hardware_irq_flag)
 
 void hardware_set_pin_condition(int pin_num);
 void hardware_set_set_pins(int base, int num_pins, int line);
@@ -174,6 +194,8 @@ void hardware_init_current_up_pc_if_needed(int8_t first_instruction_location);
 
 bool hardware_irq_flag_set(uint8_t irq, bool set_or_clear);
 bool hardware_irq_flag_is_set(uint8_t irq);
+
+void hardware_enable_irq_handler(uint8_t pio, uint8_t irq, uint8_t flag, uint8_t line);
 
 /************************************************************************************************************************
  *

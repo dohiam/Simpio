@@ -19,6 +19,7 @@ void printf_zero_pattern(uint32_t n, bool direction);
 
 void printf_instructions();
 void printf_user_instructions();
+void printf_ih_instructions();
 void printf_defines();
 void printf_labels();
 void printf_user_vars();

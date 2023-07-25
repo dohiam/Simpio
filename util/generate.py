@@ -24,7 +24,8 @@ config_mapping = { 'JMP_PIN'             : 'sm_config_set_jmp_pin(&sm_config,<1>
                    'FIFO_MERGE'          : 'sm_config_set_fifo_join(&sm_config,<1>);',
                    'CLKDIV'              : 'sm_config_set_clkdiv_int_frac (&sm_config, <1>, 0);',
                    'USER_VAR'            : 'uint32_t <1>;',
-                   'USER_PROCESSOR'      : '\n' }
+                   'USER_PROCESSOR'      : '\n' ,
+                   'INTERRUPT_SOURCE'    : 'map_irq_flag_to_irq_and_enable_interrupt_handler(<1>, <2>, <3>, &irq_handler );' }
                   
 
 user_mapping = { 'WRITE'            : 'pio_sm_put_blocking(pio, sm, <1>);',
@@ -65,6 +66,42 @@ void receive_line(char * s, int max, PIO pio, uint sm) {
     }
     s[i] = '\\0';
 }
+
+// The following maps an irq flag to a PIO irq and enables a hardware interrupt based on it
+// Note: Each PIO has irq num 0 and 1
+// Note: Across all SMs are irq flags 0..7 flags but only 0..3 can be mapped to an interrupt
+// This routine is helpful to deal with some indexes being arguments while others being embedded in the function or constant name
+void map_irq_flag_to_irq_and_enable_interrupt_handler(uint8_t flag, uint8_t pionum, uint8_t irq, void (*irq_handler)() ) {
+    enum pio_interrupt_source src;
+    uint interrupt_number;
+    PIO pio;
+    if (pionum == 0) pio = pio0;
+    else pio = pio1;
+    switch (flag) {
+        case 0: src = pis_interrupt0; break;
+        case 1: src = pis_interrupt1; break;
+        case 2: src = pis_interrupt2; break;
+        case 3: src = pis_interrupt3; break;
+        default: return;
+    }
+    switch (irq) {
+        case 0: 
+            pio_set_irq0_source_enabled(pio, src, true);
+            if (pio == pio0) { interrupt_number = PIO0_IRQ_0; }
+            else { interrupt_number = PIO1_IRQ_0; }
+            break;
+        case 1:
+            pio_set_irq1_source_enabled(pio, src, true);
+            if (pio == pio0) { interrupt_number = PIO0_IRQ_1; }
+            else { interrupt_number = PIO1_IRQ_1; }
+            break;
+        default: return;
+    };
+    irq_set_exclusive_handler(interrupt_number, irq_handler);
+    irq_set_enabled(interrupt_number, true);
+}
+
+
 
 """
 
@@ -137,10 +174,15 @@ in_lines = inf.readlines()
 serial = 'RS232'
 cpp = -1
 cup = -1
+ihp = -1
 current_pio = 0
 current_sm = 0
 ppgms = []
 upgms = []
+ihpgm = ''
+ihinit = ''
+
+interrupt_context = False
 
 pio_file_string = ''
 
@@ -159,6 +201,8 @@ for line in in_lines:
         ppgms.append(pio_program(name=program_name, init_function="% c-sdk {\nstatic inline void " + program_name + "_init() {", pio='', sm=''))
         pio_file_string = pio_file_string + line
         #user_program_headers = user_program_headers + '\n#include ' + program_name + '.pio.h'
+    elif len(words) > 0 and words[0].upper() == ".DEVICE":
+        continue
     elif len(words) > 0 and words[0].upper() == ".CONFIG" and words[1].upper() == "PIO":
         if words[2] == "1":
             current_pio = "pio1"
@@ -180,6 +224,7 @@ for line in in_lines:
         else:
             CMakeLists = CMakeLists + RS232_SERIAL
     elif len(words) > 0 and words[0].upper() == ".CONFIG" and words[1].upper() == "USER_PROCESSOR":
+        interrupt_context = False
         cup = cup + 1
         user_processor = words[2]
         if (user_processor == '0'):
@@ -201,14 +246,34 @@ for line in in_lines:
             upgms[cup].body = upgms[cup].body + '\n    printf("main starting\\n");'
             upgms[cup].body = upgms[cup].body + multicore_launch_placeholder
         upgms[cup].body = upgms[cup].body + '\n    ' + upgms[cup].name + '_init();'
+    elif len(words) > 0 and words[0].upper() == ".CONFIG" and words[1].upper() == "INTERRUPT_HANDLER":
+        interrupt_context = True
+        ihp = ihp + 1
+        handler_num = words[2]
+        if (handler_num == '0'):
+            ihp = 0
+            ihpgm = "void irq_handler() {\n    PIO pio=" + current_pio + ";\n    uint sm=" + current_sm + ";"
+        else:
+            print("Warning: current script only generates code for one irq_handler - interrupt handler 0: " + handler_num + " line: " + str(line_num) + "\n");
+            sys.exit(-1)        
+    elif len(words) > 0 and words[0].upper() == ".CONFIG" and words[1].upper() == "INTERRUPT_SOURCE":
+        template = config_mapping[words[1].upper()]
+        arg_list = words[2:]
+        ihinit = ihinit + "\n" + "    " + subst_args(arg_list, template)
     elif len(words) > 0 and words[0].upper() == ".CONFIG" and words[1].upper() == "USER_VAR":
         template = config_mapping[words[1].upper()]
         arg_list = words[2:]
-        upgms[cup].body = upgms[cup].body + '\n    ' + subst_args(arg_list, template)
+        if (interrupt_context):
+            ihpgm = ihpgm + '\n    ' + subst_args(arg_list, template)
+        else:
+            upgms[cup].body = upgms[cup].body + '\n    ' + subst_args(arg_list, template)
     elif len(words) > 0 and is_user_instruction(words[0]):
         template = user_mapping[words[0].upper()]
         arg_list = words[1:]
-        upgms[cup].body = upgms[cup].body + "\n" + "    " + subst_args(arg_list, template)
+        if (interrupt_context):
+            ihpgm = ihpgm + "\n" + "    " + subst_args(arg_list, template)
+        else:
+            upgms[cup].body = upgms[cup].body + "\n" + "    " + subst_args(arg_list, template)
     elif len(words) > 1 and is_config_instruction(words[1]):
         template = config_mapping[words[1].upper()]
         arg_list = words[2:]
@@ -225,6 +290,7 @@ else:
 for u in upgms:
     if u.up == 0:
         u.body = u.body.replace(multicore_launch_placeholder, multicore_launch)
+        u.body = u.body + ihinit
         u.body = u.body + '\n    while (true) {\n        printf("main idling ...\\n");\n        sleep_ms(10000);\n    }'
 
 
@@ -233,6 +299,8 @@ for p in ppgms:
 
 for u in upgms:
     u.body = u.body + "\n}"
+    
+ihpgm = ihpgm + '\n}\n\n'
 
 print("\nCMakeLists.txt:")
 print('set(myprojectname "' + project_name + '")')
@@ -257,9 +325,13 @@ if len(upgms) > 1:
 if len(upgms) > 0:
     print(upgms[0].body + '\n')
 
+print("\nIH PROGRAM:")
+print(ihpgm)
+
 f = open("CMakeLists.txt", "w")
 f.write('set(myprojectname "' + project_name + '")\n')
 pn = 0
+
 for p in ppgms:
       f.write('set(program' + str(pn) + ' "' + p.name + '")\n')
       pn = pn+1
@@ -275,6 +347,7 @@ f.close()
 f = open(project_name+".c", "w")
 f.write(user_program_headers)
 f.write(helper_functions)
+f.write(ihpgm)
 if len(upgms) > 1:
     f.write(upgms[1].body)
 if len(upgms) > 0:

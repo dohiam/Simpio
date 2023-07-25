@@ -21,19 +21,27 @@ static pio_t pios[NUM_PIOS];
 static sm_t  sms[NUM_PIOS * NUM_SMS];  /* sm index for the s'th sm in p'th pio is p*NUM_SMS + s */ 
 static gpio_t gpios[NUM_GPIOS];
 static user_processor_t user_processors[NUM_USER_PROCESSORS];
-static irq_flags_t hardware_irq_flags[NUM_IRQ_FLAGS];
+static ih_processor_t ih_processors[NUM_IH_PROCESSORS];
+static hardware_irq_flag_t hardware_irq_flags[NUM_IRQ_FLAGS];
 
 static int current_pio = -1;
 static int current_sm = -1;
 static int current_up = -1;
+static int current_ih = -1;
 
 static char current_program_name[SYMBOL_MAX];
+
+static user_instruction_context_e user_instruction_context;
+user_instruction_context_e hardware_get_user_instruction_context()  {return user_instruction_context;}
+
 
 /* enumerators */
 
 IMPLEMENT_ENUMERATOR(pio_t, hardware_pio, pios, NUM_PIOS)
 IMPLEMENT_ENUMERATOR(sm_t, hardware_sm, sms, NUM_PIOS * NUM_SMS)
 IMPLEMENT_ENUMERATOR(user_processor_t, hardware_user_processor, user_processors, NUM_USER_PROCESSORS)
+IMPLEMENT_ENUMERATOR(ih_processor_t, hardware_ih_processor, ih_processors, NUM_IH_PROCESSORS)
+IMPLEMENT_ENUMERATOR(hardware_irq_flag_t, hardware_irq_flag, hardware_irq_flags, NUM_IRQ_FLAGS)
 
 /* some syntactic sugar macros */
 #define CURRENT_PIO pios[current_pio]
@@ -68,7 +76,18 @@ void hardware_set_up(uint8_t pnum, int line) {
         current_up = NUM_USER_PROCESSORS-1;
     }
     else current_up = pnum;
+    user_instruction_context = up_context;
 }
+
+void hardware_set_ih(uint8_t pnum, int line) {
+    if (pnum >= NUM_IH_PROCESSORS) {
+        PRINT("Error (line %d): max ih processors is %d\n", line, NUM_IH_PROCESSORS-1);
+        current_ih = NUM_IH_PROCESSORS-1;
+    }
+    else current_ih = pnum;
+    user_instruction_context = ih_context;
+}
+
 
 void hardware_set_set_pins(int base, int num_pins, int line) {
     CURRENT_SM.set_pins_base = base;
@@ -128,8 +147,8 @@ void hardware_set_pio_instruction_cache(uint8_t pio) {
 }
 
 void hardware_set_pio_defaults(uint8_t pio, uint8_t num) {
-    THIS_PIO.irqs[0].value = false;
-    THIS_PIO.irqs[1].value = false;
+    THIS_PIO.irqs[0].enabled = false;
+    THIS_PIO.irqs[1].enabled = false;
     THIS_PIO.this_num = num;
     hardware_set_pio_instruction_cache(pio);
 }
@@ -217,6 +236,36 @@ void hardware_reset_user_processors() {
     }
 }
 
+void hardware_reset_ih_processor_instruction_cache(int p) {
+    int i;
+    for (i=0; i<NUM_USER_INSTRUCTIONS; i++) {
+        instruction_set_user_defaults(&(ih_processors[p].instructions[i]));
+    }
+}
+
+void hardware_reset_ih_processor(int p) {
+    ih_processors[p].next_instruction_location = 0;
+    ih_processors[p].pc = -1;
+    ih_processors[p].this_num = p;
+    ih_processors[p].data[0] = '\0';
+    hardware_reset_ih_processor_instruction_cache(p);
+}
+
+void hardware_reset_ih_processors() {
+    int p;
+    for (p=0; p<NUM_IH_PROCESSORS; p++) {
+        hardware_reset_ih_processor(p);
+    }
+}
+
+void hardware_reset_irq_flags() {
+ int i;
+  for (i=0; i < NUM_IRQ_FLAGS; i++) {
+    hardware_irq_flags->set = false; 
+    hardware_irq_flags->mapped_to_irq = false;
+  }
+}
+
 void hardware_set_system_defaults() {
     int pio;
     current_pio = 0;
@@ -224,6 +273,7 @@ void hardware_set_system_defaults() {
     hardware_set_pios_defaults();
     hardware_set_sms_defaults();
     hardware_reset_user_processors();
+    hardware_reset_ih_processors();
     instruction_set_global_default();
 }
 
@@ -243,7 +293,7 @@ void hardware_set_gpio_dir(uint8_t num, bool dir) { CHECK_GPIO(num) gpios[num].p
 bool hardware_get_gpio(uint8_t num) { CHECK_GPIO_B(num) return gpios[num].value; } 
 bool hardware_get_gpio_dir(uint8_t num) { CHECK_GPIO_B(num) return gpios[num].pindir; } 
 
-void hardware_set_irq(uint8_t irq_num, bool value) {pios[current_pio].irqs[irq_num].value = value;}
+void hardware_set_irq(uint8_t irq_num, bool value) {pios[current_pio].irqs[irq_num].set = value;}
 
 void hardware_set_program_name(char* name) {
    snprintf(current_program_name, SYMBOL_MAX, "%s", name); 
@@ -274,7 +324,10 @@ bool hardware_irq_flag_set(uint8_t irq, bool set_or_clear) {
         hardware_irq_flags[irq].set = set_or_clear;
         return true;
     }
-    else return false;
+    else {
+        PRINT("error: invalid irq flag %d\n", irq);
+        return false;
+    }
 }
 
 void hardware_fifo_merge(fifo_mode_t mode) {
@@ -282,6 +335,25 @@ void hardware_fifo_merge(fifo_mode_t mode) {
     fifo_init(f, mode);
 }
 
+void hardware_enable_irq_handler(uint8_t pio, uint8_t irq, uint8_t flag, uint8_t line) {
+    if (pio >= NUM_PIOS) {
+        PRINT("Error line %d: can't set pio %d irq handler; max num PIOs is %d\n", line, pio, NUM_PIOS);
+        return;
+    }
+    if (irq >= NUM_IRQS) {
+        PRINT("Error line %d: can't set irq %d as irq handler; max num IRQss is %d\n", line, pio, NUM_IRQS);
+        return;
+    }
+    if (irq >= 4) {
+        PRINT("Error line %d: can't flag irq %d as irq handler; only flag for IRQs are 0..3\n", line, flag);
+        return;
+    }
+    pios[pio].irqs[irq].enabled = true;
+    pios[pio].irqs[irq].flag = flag;
+    hardware_irq_flags[flag].mapped_to_irq = true;
+    hardware_irq_flags[flag].pio = pio;
+    hardware_irq_flags[flag].ih = &(ih_processors[current_ih]);
+}
 
 /************************************************************************************************
   get 
@@ -290,6 +362,7 @@ void hardware_fifo_merge(fifo_mode_t mode) {
 uint8_t hardware_pio_num_set() { return current_pio; }
 uint8_t hardware_sm_num_set() { return current_sm; }
 uint8_t hardware_up_num_set() { return current_up; }
+uint8_t hardware_ih_num_set() { return current_ih; }
 
 
 pio_t * hardware_pio_set() {return &(pios[current_pio]);}
@@ -297,7 +370,9 @@ sm_t *  hardware_sm_set()  {return &(sms[current_sm]);}
 
 user_processor_t* hardware_user_processor_set() { return &(user_processors[current_up]); }
 
-bool hardware_get_irq(uint8_t irq_num) {return pios[current_pio].irqs[irq_num].value;}
+ih_processor_t* hardware_ih_processor_set() { return &(ih_processors[current_ih]); }
+
+bool hardware_get_irq(uint8_t irq_num) {return pios[current_pio].irqs[irq_num].set;}
 
 bool hardware_irq_flag_is_set(uint8_t irq) {
     if (irq < NUM_IRQ_FLAGS) {

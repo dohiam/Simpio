@@ -108,9 +108,9 @@ static void printf_bit_count(uint8_t sc) {
     printf("shift count: %2d ", sc);
 }
                                      
-static void printf_clear(bool cl) {
-    if(cl) {printf("clear: true ");}
-    else {printf("clear: false ");}
+static void printf_set_or_clear(operation_e op) {
+    if(op == clear_operation) {printf("clear ");}
+    else {printf("set  ");}
 }
                                      
 static void printf_wait(bool w) {
@@ -236,7 +236,7 @@ static void printf_instruction(instruction_t* instr) {
             break;
         case irq_instruction: 
             printf("instruction: IRQ "); 
-            printf_clear(instr->clear);
+            printf_set_or_clear(instr->operation);
             printf_wait(instr->wait);
             break;
         case set_instruction: 
@@ -259,7 +259,7 @@ void printf_instructions() {
     FOR_ENUMERATION(pio, pio_t, hardware_pio) {
       printf("pio: %d (%d)\n", p, pio->next_instruction_location);
       for (i = 0; i<pio->next_instruction_location; i++) {
-        printf("  ");
+        printf("  PC: %d  ", i);
         printf_instruction(&(pio->instructions[i]));        
       }
     }
@@ -340,6 +340,20 @@ void printf_user_instructions() {
     }
 }
 
+void printf_ih_instructions() {
+    int unum,i,p;
+    printf("\nINTERRUPT HANDLER(S) INSTRUCTIONS: \n");
+    unum = 0;
+    FOR_ENUMERATION(ih, ih_processor_t, hardware_ih_processor) {
+      unum++;
+      printf("ih: %d  PC: %d next_instruction_location: %d\n", unum, ih->pc, ih->next_instruction_location);
+      for (i = 0; i<ih->next_instruction_location; i++) {
+        printf("  ");
+        printf_user_instruction(&(ih->instructions[i]));        
+      }
+    }
+}
+
 void printf_defines() {
     int i;
     printf("\nDEFINES: \n");
@@ -357,6 +371,7 @@ void printf_labels() {
 }
 
 void printf_hardware_configuration() {
+    int i;
     printf("\nHardware Configuration:\n");
     printf("   Current PIO: %d", hardware_pio_num_set());
     printf("   Current SM: %d\n", hardware_sm_num_set());
@@ -374,6 +389,13 @@ void printf_hardware_configuration() {
                 printf("         sset pins base: %d  num_pins: %d  optional: %d\n", sm->side_set_pins_base, sm->side_set_pins_num, sm->side_set_pins_optional);
                 printf("         shift out dir: %d\n", sm->shiftctl_out_shiftdir);
             }
+        }
+        i=0;
+        FOR_ENUMERATION(f, hardware_irq_flag_t, hardware_irq_flag) {
+            if (f->mapped_to_irq) {
+                printf("      irq %d mapped to handler\n", i);
+            }
+            i++;
         }
     }
     printf("Devices Enabled: \n");
@@ -488,9 +510,9 @@ static void print_bit_count(uint8_t sc) {
     status_msg("shift count: %2d ", sc);
 }
                                      
-static void print_clear(bool cl) {
-    if(cl) {status_msg("clear: true ");}
-    else {status_msg("clear: false ");}
+static void print_set_or_clear(operation_e op) {
+    if(op == clear_operation) {status_msg("clear ");}
+    else {status_msg("set  ");}
 }
                                      
 static void print_wait(bool w) {
@@ -555,7 +577,7 @@ void print_instruction(instruction_t* instr) {
             break;
         case irq_instruction: 
             status_msg("instruction: IRQ "); 
-            print_clear(instr->clear);
+            print_set_or_clear(instr->operation);
             print_wait(instr->wait);
             break;
         case set_instruction: 

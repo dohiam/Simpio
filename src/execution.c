@@ -33,7 +33,14 @@ int current_label;
 
 program_t cp;  /* TODO multiple simultaneous program support */
 
-static bool SIMULATION_EXITED = false;
+static bool SIMULATION_EXITED;
+
+static exec_context_e exec_context;
+
+void exec_reset() {
+    exec_context = exec_normal;
+    SIMULATION_EXITED = false;
+}
 
 /***********************************************************************************************************
  * helpers
@@ -432,6 +439,30 @@ bool exec_instruction_decode(sm_t * sm) {
 }
 
 /***********************************************************************************************************
+ * interrupt handlers
+ **********************************************************************************************************/
+
+int exec_enable_ih(ih_processor_t * ih) {
+    PRINT("enabling ihs\n");
+    exec_context = exec_interrupt;
+    ih->enabled = true;
+    ih->pc = 0;
+    return ih->instructions[0].line;
+}
+
+int fired_ihs() {
+    PRINTD("checking ihs\n");
+    FOR_ENUMERATION(f, hardware_irq_flag_t, hardware_irq_flag) {
+        if (f->mapped_to_irq && f->set) {
+            if (!(f->ih->enabled) ) {
+                return exec_enable_ih(f->ih);
+            }
+        }
+    }
+    return -1;
+}
+
+/***********************************************************************************************************
  * find instructions for scheduling
  **********************************************************************************************************/
 
@@ -451,22 +482,22 @@ instruction_t* next_instruction() {
     for (sm_count = 0, found_sm_with_instructions = false; sm_count < (NUM_PIOS * NUM_SMS) && !found_sm_with_instructions; sm_count++) {
       if (!sm) {  /* this should only be true when first initialized */
         sm = hardware_sm_first(&e);
-        PRINTD("first e = %d pio= %d sm = %d\n", e, sm->pio_num, sm->this_num);
+        //PRINTD("first e = %d pio= %d sm = %d\n", e, sm->pio_num, sm->this_num);
       }
       else {  /* not the first time through */
         sm = hardware_sm_next(&e);
         if (sm) {
-            PRINTD("next e = %d pio= %d sm = %d\n", e, sm->pio_num, sm->this_num);
-            PRINTD("next sm  = %x\n", e);
+            //PRINTD("next e = %d pio= %d sm = %d\n", e, sm->pio_num, sm->this_num);
+            //PRINTD("next sm  = %x\n", e);
         }
         if (!sm) {
-          PRINTD("going back to first sm\n");
+          //PRINTD("going back to first sm\n");
           sm = hardware_sm_first(&e);
-          PRINTD("first e = %d pio= %d sm = %d\n", e, sm->pio_num, sm->this_num);
+          //PRINTD("first e = %d pio= %d sm = %d\n", e, sm->pio_num, sm->this_num);
         }
       }
       pio = (pio_t *) sm->pio;
-      PRINTD("instruction num = %d\n", sm->pc);
+      //PRINTD("instruction num = %d\n", sm->pc);
       if ( (sm->pc >= 0) && (pio->instructions[sm->pc].instruction_type != empty_instruction) ) {
           found_sm_with_instructions = true;
           found_instruction = &(pio->instructions[sm->pc]);
@@ -580,6 +611,41 @@ static void run_each_enabled_device() {
     }    
 }
 
+int exec_find_next_instruction_after_interrupt() {
+    bool found_user_instruction;
+    bool found_sm_instruction;
+    instruction_t* instruction;
+    user_instruction_t* user_instruction;
+    instruction = next_instruction();
+    found_sm_instruction = try_sm(&instruction);
+    if (found_sm_instruction) return instruction->line;
+    found_user_instruction = try_user(&user_instruction);
+    if (found_user_instruction) return user_instruction->line;
+    return -1;
+}
+
+int exec_step_programs_next_interrupt_instruction() {
+    bool completed;
+    user_instruction_t * instr;
+    FOR_ENUMERATION(ih, ih_processor_t, hardware_ih_processor) {
+        if (ih->pc >= 0) {
+            instr = &(ih->instructions[ih->pc]);
+            instr->executing_up = (void *) ih;
+            completed = exec_run_user_instruction(instr);
+            PRINT("pc %d (%d)\n", ih->pc, ih->next_instruction_location);
+            if (ih->pc >= ih->next_instruction_location) {
+                PRINTI("ih completed\n");
+                ih->enabled = false;
+                exec_context = exec_normal;
+                return exec_find_next_instruction_after_interrupt();
+            }
+            else return ih->instructions[ih->pc].line;
+        }
+    }
+    return -1;
+}
+
+
 int exec_step_programs_next_instruction() {
     static user_instruction_t* user_instruction = NULL;
     static instruction_t* instruction = NULL;
@@ -590,12 +656,24 @@ int exec_step_programs_next_instruction() {
     sm_t * sm;
     bool completed;
     
-    if (SIMULATION_EXITED) return last_line;
+    if (SIMULATION_EXITED) {
+        PRINTD("exec idle\n");
+        exec_context = exec_idle;
+        return last_line;
+    }
+    
+    if (exec_context == exec_interrupt) {
+        PRINTD("exec interrupt\n");
+        return exec_step_programs_next_interrupt_instruction();
+    }
     
     found_user_instruction = try_user(&user_instruction);
     found_sm_instruction = try_sm(&instruction);
     
-    if (!found_user_instruction && !found_sm_instruction) return last_line;
+    if (!found_user_instruction && !found_sm_instruction) {
+        PRINTD("no user or sm instruction found, returning last line\n");
+        return last_line;
+    }
     
     if ( (try_user_first && found_user_instruction) || (!try_user_first  && !found_sm_instruction) ) {
         // execute user instruction and get next one
@@ -635,6 +713,8 @@ int exec_step_programs_next_instruction() {
         sm = (sm_t *) instruction->executing_sm;
         sm->clock_tick++;
         instruction = next_instruction();
+        last_line = fired_ihs();
+        if (last_line >= 0) return last_line;  // and are now in interrupt context
         found_sm_instruction = try_sm(&instruction);
         if (found_user_instruction) last_line = user_instruction->line;
         else {
@@ -1216,6 +1296,7 @@ bool run_mov_instruction(instruction_t * instruction) {
             break;
         case osr_destination:
             sm->osr = value;
+            sm->osr_empty = false;
             PRINTI("to osr\n");
             break;
         default: 
@@ -1265,10 +1346,29 @@ bool run_set_instruction(instruction_t * instruction) {
 bool run_irq_instruction(instruction_t * instruction) {
     sm_t * sm = (sm_t *) instruction->executing_sm;
     bool completed = true;
+    bool flag_state;
+    PRINT("running irq instruction line %d\n", instruction->line);
     switch (instruction->operation) {
-        case set_operation:
-            PRINTI("setting irq %d\n", instruction->index_or_value);
+        case nowait_operation:
+            PRINTI("setting irq without waiting %d\n", instruction->index_or_value);
             hardware_irq_flag_set(instruction->index_or_value, true);
+            break;
+        case wait_operation:
+            if (instruction->already_set_waiting) {
+                PRINTI("waiting for clear %d\n", instruction->index_or_value);
+                flag_state = hardware_irq_flag_is_set(instruction->index_or_value);
+                if (!flag_state) {
+                    instruction->already_set_waiting = false;
+                    completed = true;
+                }
+                else completed = false;
+            }
+            else {
+                PRINTI("setting irq and waiting for clear %d\n", instruction->index_or_value);
+                hardware_irq_flag_set(instruction->index_or_value, true);
+                instruction->already_set_waiting = true;
+                completed = false;
+            }
             break;
         case clear_operation:
             PRINTI("clearing irq %d\n", instruction->index_or_value);
@@ -1469,6 +1569,7 @@ bool exec_run_instruction(instruction_t * instruction) {
     bool completed;
     sm_t * sm = (sm_t *) instruction->executing_sm;
     if (!instruction->in_delay_state) {
+        PRINTD("instruction: %d\n", instruction->instruction_type);
         switch (instruction->instruction_type) {
             case jmp_instruction:    completed = run_jmp_instruction(instruction); break;
             case wait_instruction:   completed = run_wait_instruction(instruction); break;
@@ -1481,6 +1582,7 @@ bool exec_run_instruction(instruction_t * instruction) {
             case set_instruction:    completed = run_set_instruction(instruction); break;
             case irq_instruction:    completed = run_irq_instruction(instruction); break;
             case empty_instruction:  completed = run_empty_instruction(instruction); break;
+            default: PRINT("ERROR: unknown instruction\n"); break;
         };
         if (!sm->side_set_pins_optional && instruction->side_set_value < 0) {
             PRINT("Error: side set is not optional and no side set value set, assuming zero\n");

@@ -21,6 +21,7 @@
 
 #define NUM_INSTRUCTIONS 132
 #define NUM_USER_INSTRUCTIONS 32
+#define NUM_IH_INSTRUCTIONS 32
 #define NUM_DEFINES 32
 #define SYMBOL_MAX 32
 #define LABEL_MAX SYMBOL_MAX
@@ -71,6 +72,7 @@ typedef struct {
     bool              clear;
     bool              wait;
     bool              is_relative;
+    bool              already_set_waiting;/* when setting IRQ and waiting for it to be cleared */
     int8_t            address;            /* the address of this instruction */
     /* housekeeping data */
     bool              in_delay_state;     /* when the instruction has a delay value, this indicates whther it is waiting for the delay count to be reached */

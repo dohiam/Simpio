@@ -24,6 +24,7 @@
 
 #define CURRENT_INSTRUCTION hardware_pio_set()->instructions[hardware_pio_set()->next_instruction_location]
 #define CURRENT_USER_INSTRUCTION hardware_user_processor_set()->instructions[hardware_user_processor_set()->next_instruction_location]
+#define CURRENT_IH_INSTRUCTION hardware_ih_processor_set()->instructions[hardware_ih_processor_set()->next_instruction_location]
 
 static int current_definition;
 static int current_label;
@@ -212,6 +213,7 @@ bool instruction_add(instruction_t* instr) {
     CURRENT_INSTRUCTION.if_full = instr->if_full;
     CURRENT_INSTRUCTION.if_empty = instr->if_empty;
     CURRENT_INSTRUCTION.block = instr->block;
+    CURRENT_INSTRUCTION.already_set_waiting = false;
     CURRENT_INSTRUCTION.operation = instr->operation;
     CURRENT_INSTRUCTION.index_or_value = instr->index_or_value;
     CURRENT_INSTRUCTION.bit_count = instr->bit_count;
@@ -230,33 +232,63 @@ bool instruction_add(instruction_t* instr) {
 }
 
 bool instruction_user_add(user_instruction_t* instr){
-    if ( (hardware_up_num_set() != 0) && (hardware_up_num_set() != 1) ) {
-        PRINT("ERROR: user instruction on line %d, but no user processor set (.config user_processor <0|1?\n", instr->line);
-        return false;
+    user_instruction_context_e context = hardware_get_user_instruction_context();
+    if (context == up_context) {
+        if ( (hardware_up_num_set() != 0) && (hardware_up_num_set() != 1) ) {
+            PRINT("ERROR: user instruction on line %d, but no user processor set (.config user_processor <0|1?\n", instr->line);
+            return false;
+        }
+        if (hardware_user_processor_set()->next_instruction_location == NUM_USER_INSTRUCTIONS) {
+            PRINT("\nERROR line %d: number of user instructions (%d) exceeded\n", instr->line, NUM_USER_INSTRUCTIONS);
+            return false;
+        }
+        PRINTD("\n---->adding user instruction Line: %d, value:%0x\n", instr->line, instr->value);
+        CURRENT_USER_INSTRUCTION.line = instr->line;
+        CURRENT_USER_INSTRUCTION.instruction_type = instr->instruction_type;
+        CURRENT_USER_INSTRUCTION.data_operation_type = instr->data_operation_type;
+        CURRENT_USER_INSTRUCTION.data_ptr = instr->data_ptr;
+        CURRENT_USER_INSTRUCTION.value = instr->value;
+        CURRENT_USER_INSTRUCTION.pin = instr->pin;
+        CURRENT_USER_INSTRUCTION.set_high = instr->set_high;
+        CURRENT_USER_INSTRUCTION.delay = instr->delay;
+        CURRENT_USER_INSTRUCTION.continue_user = instr->continue_user;
+        CURRENT_USER_INSTRUCTION.delay_left = -1;
+        CURRENT_USER_INSTRUCTION.in_delay_state = false;
+        CURRENT_USER_INSTRUCTION.executing_sm = (void *) hardware_sm_set();
+        snprintf(CURRENT_USER_INSTRUCTION.var_name, SYMBOL_MAX, "%s", instr->var_name);
+        hardware_init_current_up_pc_if_needed(hardware_user_processor_set()->next_instruction_location);  /* first instruction added for this sm will be the first to execute on this sm */
+        CURRENT_USER_INSTRUCTION.address = hardware_user_processor_set()->next_instruction_location;
+        hardware_user_processor_set()->next_instruction_location++;
+        return true;
     }
-    if (hardware_user_processor_set()->next_instruction_location == NUM_USER_INSTRUCTIONS) {
-        PRINT("\nERROR line %d: number of user instructions (%d) exceeded\n", instr->line, NUM_USER_INSTRUCTIONS);
-        return false;
+    else {
+        
+        if ( (hardware_ih_num_set() != 0) && (hardware_ih_num_set() != 1) ) {
+            PRINT("ERROR: user instruction on line %d in interrupt handler context, but no interrupt handler number set (.config interrupt_handler <0|1?\n", instr->line);
+            return false;
+        }
+        if (hardware_ih_processor_set()->next_instruction_location == NUM_IH_INSTRUCTIONS) {
+            PRINT("\nERROR line %d: number of interrupt handler instructions (%d) exceeded\n", instr->line, NUM_IH_INSTRUCTIONS);
+            return false;
+        }
+        PRINTD("\n---->adding interrupt handler instruction Line: %d, value:%0x\n", instr->line, instr->value);
+        CURRENT_IH_INSTRUCTION.line = instr->line;
+        CURRENT_IH_INSTRUCTION.instruction_type = instr->instruction_type;
+        CURRENT_IH_INSTRUCTION.data_operation_type = instr->data_operation_type;
+        CURRENT_IH_INSTRUCTION.data_ptr = instr->data_ptr;
+        CURRENT_IH_INSTRUCTION.value = instr->value;
+        CURRENT_IH_INSTRUCTION.pin = instr->pin;
+        CURRENT_IH_INSTRUCTION.set_high = instr->set_high;
+        CURRENT_IH_INSTRUCTION.delay = instr->delay;
+        CURRENT_IH_INSTRUCTION.continue_user = instr->continue_user;
+        CURRENT_IH_INSTRUCTION.delay_left = -1;
+        CURRENT_IH_INSTRUCTION.in_delay_state = false;
+        CURRENT_IH_INSTRUCTION.executing_sm = (void *) hardware_sm_set();
+        snprintf(CURRENT_IH_INSTRUCTION.var_name, SYMBOL_MAX, "%s", instr->var_name);
+        CURRENT_IH_INSTRUCTION.address = hardware_ih_processor_set()->next_instruction_location;
+        hardware_ih_processor_set()->next_instruction_location++;
+        return true;
     }
-    PRINTD("\n---->adding user instruction Line: %d, value:%0x\n", instr->line, instr->value);
-    //CURRENT_USER_INSTRUCTION.pio = hardware_pio_set();
-    CURRENT_USER_INSTRUCTION.line = instr->line;
-    CURRENT_USER_INSTRUCTION.instruction_type = instr->instruction_type;
-    CURRENT_USER_INSTRUCTION.data_operation_type = instr->data_operation_type;
-    CURRENT_USER_INSTRUCTION.data_ptr = instr->data_ptr;
-    CURRENT_USER_INSTRUCTION.value = instr->value;
-    CURRENT_USER_INSTRUCTION.pin = instr->pin;
-    CURRENT_USER_INSTRUCTION.set_high = instr->set_high;
-    CURRENT_USER_INSTRUCTION.delay = instr->delay;
-    CURRENT_USER_INSTRUCTION.continue_user = instr->continue_user;
-    CURRENT_USER_INSTRUCTION.delay_left = -1;
-    CURRENT_USER_INSTRUCTION.in_delay_state = false;
-    CURRENT_USER_INSTRUCTION.executing_sm = (void *) hardware_sm_set();
-    snprintf(CURRENT_USER_INSTRUCTION.var_name, SYMBOL_MAX, "%s", instr->var_name);
-    hardware_init_current_up_pc_if_needed(hardware_user_processor_set()->next_instruction_location);  /* first instruction added for this sm will be the first to execute on this sm */
-    CURRENT_USER_INSTRUCTION.address = hardware_user_processor_set()->next_instruction_location;
-    hardware_user_processor_set()->next_instruction_location++;
-    return true;
 }                         
 
 void instruction_add_data(user_instruction_t* instr, char * data) {
@@ -366,6 +398,15 @@ void instruction_for_line(uint8_t line, instruction_or_user_instruction_t * inst
         if (up->instructions[instruction].line == line) {
             instr->instruction_type = _user_instruction;
             instr->ioru.user_instruction_ptr = &(up->instructions[instruction]);
+            return;
+        }
+      }
+  }
+  FOR_ENUMERATION(ih, ih_processor_t, hardware_ih_processor) {
+      for (instruction=0; instruction<NUM_IH_INSTRUCTIONS; instruction++) {
+        if (ih->instructions[instruction].line == line) {
+            instr->instruction_type = _user_instruction;
+            instr->ioru.user_instruction_ptr = &(ih->instructions[instruction]);
             return;
         }
       }

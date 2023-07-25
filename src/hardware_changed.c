@@ -33,7 +33,7 @@ typedef struct {
 } sm_snapshot_t;
 
 typedef struct {
-    irq_t irqs[NUM_IRQS];
+    hardware_irq_t irqs[NUM_IRQS];
     bool  irqs_changed[NUM_IRQS];
 } pio_snapshot_t;
 
@@ -54,7 +54,7 @@ void hardware_snapshot() {
     bool gpio, gpio_dir;
     pio_num = 0;
     FOR_ENUMERATION(pio, pio_t, hardware_pio) {
-      for (irq_num=0; irq_num < NUM_IRQS; irq_num++) pio_snapshots[pio_num].irqs[irq_num].value = pio->irqs[irq_num].value;
+      for (irq_num=0; irq_num < NUM_IRQS; irq_num++) pio_snapshots[pio_num].irqs[irq_num].set = pio->irqs[irq_num].set;
       pio_num++;
     }
     sm_num = 0;
@@ -90,7 +90,7 @@ hardware_changed_t * hardware_get_changed() {
   pio_num = 0;
   FOR_ENUMERATION(pio, pio_t, hardware_pio) {
       for (irq_num=0; irq_num < NUM_IRQS; irq_num++) {
-          hardware_changed.pios[pio_num].irqs[irq_num] = (pio->irqs[irq_num].value != pio_snapshots[pio_num].irqs[irq_num].value);
+          hardware_changed.pios[pio_num].irqs[irq_num] = (pio->irqs[irq_num].set != pio_snapshots[pio_num].irqs[irq_num].set);
       }
       sm_num = 0;
       FOR_ENUMERATION(sm, sm_t, hardware_sm) {

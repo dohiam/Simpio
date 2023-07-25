@@ -228,7 +228,7 @@ int stepit() {
         next_line = exec_step_programs_next_instruction();
         if (next_line > 0) {
             instruction_for_line(prev_line, &instr);
-            if (instr.instruction_type == _no_instruction) { status_msg("error: no previous instruction!\n"); }
+            if (instr.instruction_type == _no_instruction) { status_msg("error: no previous instruction: %d!\n", prev_line); }
             else {
               if (instr.instruction_type == _instruction) {
                   if (instr.ioru.instruction_ptr->in_delay_state) { status_msg("Line %d delaying\n", prev_line); }
@@ -557,6 +557,7 @@ int main(int argc, char** argv) {
             printf_defines();
             printf_instructions();
             printf_user_instructions();
+            printf_ih_instructions();
       }
   }
     
