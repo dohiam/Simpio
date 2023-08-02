@@ -1,12 +1,37 @@
+####################################################################################################################################
+#
+# Makefile for the Simpio project:
+#
+# Generally all that should be needed for general development on this project is to update the list of source files in C_SOURCES.
+# And in case is this Makefile is not executed from the build subdirectory, then modify the SRC and INC paths as needed too.
+#
+# Note that there are some build options that one can choose between:
+# a) no debug info, or debug info for gdb (for debugging) and gcov (for test coverage)
+# b) dynamic linking, or static linking
+#
+# The targets should not need to be altered unless new languages (beyond C) or new tools are used beyond LEX and YACC.
+# Note that the targets include automaticall header file dependency updating (which introduces new project dependency on sed).
+#
+####################################################################################################################################
+
+############################################
+# INPUTS
+############################################
+
+C_SOURCES = devices.c editor.c execution.c fifo.c hardware.c hardware_changed.c instruction.c main.c print.c symbols.c ui.c
+
 SRC = ../src
 INC = ../inc
 
-HEADERS = ${INC}/editor.h ${INC}/enumerator.h ${INC}/execution.h ${INC}/fifo.h ${INC}/hardware.h ${INC}/hardware_changed.h ${INC}/instruction.h ${INC}/parser.h ${INC}/print.h ${INC}/ui.h
+############################################
+# BUILD OPTIONS (debug, static link, ...)
+############################################
 
-# no debug info
+# no debug info (note: debug info left on yacc to assist user in debugging syntax issues)
 CC = gcc -I ${INC} -Werror 
 LEX = lex -i 
-YACC = yacc -d
+YACC = yacc --debug --verbose -d
+
 # static link
 LD = gcc -static-libgcc -static
 LIB =  -l:libncursesw.a -l:libtinfo.a
@@ -20,56 +45,49 @@ LIB =  -l:libncursesw.a -l:libtinfo.a
 #LD = ${CC}   -fprofile-arcs  -fprofile-generate
 #LIB =  -lncurses -ll  -lgcov
 
- 
-simpio: main.o execution.o instruction.o hardware.o fifo.o hardware_changed.o editor.o ui.o print.o parser.o lexer.o 
-	${LD} main.o execution.o instruction.o hardware.o fifo.o hardware_changed.o editor.o ui.o print.o parser.o lexer.o -o simpio ${LIB} 
+############################################
+# TARGETS
+############################################
+
+# create list of object files by substituting all C files in C_SOURCES with .o extension and adding the lexx/yacc ones
+OBJS := ${C_SOURCES:.c=.o} parser.o lexer.o
+
+# the main target rule to create the simpio executable based on all object files (and copy to the tests directory)
+simpio: $(OBJS)
+	${LD} ${OBJS} ${LIB} -o simpio
 	cp simpio ../tests/simpio
-    
-fifo_test: ${SRC}/fifo_test.c ${INC}/fifo.h fifo.o
-	${CC} ${SRC}/fifo_test.c fifo.o -o fifo_test
 
-main.o: ${SRC}/main.c ${HEADERS}
-	${CC} -c ${SRC}/main.c -o main.o
-    
-execution.o: ${SRC}/execution.c ${HEADERS}
-	${CC} -c ${SRC}/execution.c -o execution.o
+# include all dependency files (substituting .d for all .c in sources) which will trigger creating dependency files as needed
+include $(C_SOURCES:.c=.d)
 
-instruction.o: ${SRC}/instruction.c ${HEADERS}
-	${CC} -c ${SRC}/instruction.c -o instruction.o
-
-hardware.o: ${SRC}/hardware.c ${HEADERS}
-	${CC} -c ${SRC}/hardware.c -o hardware.o
-
-hardware_changed.o: ${SRC}/hardware_changed.c ${HEADERS}
-	${CC} -c ${SRC}/hardware_changed.c -o hardware_changed.o
-
-fifo.o: ${SRC}/fifo.c ${HEADERS} 
-	${CC} -c ${SRC}/fifo.c -o fifo.o
-
-editor.o: ${SRC}/editor.c ${HEADERS}
-	${CC} -c ${SRC}/editor.c -o editor.o
-
-ui.o: ${SRC}/ui.c ${HEADERS}
-	${CC} -c ${SRC}/ui.c -o ui.o
-
-print.o: ${SRC}/print.c ${HEADERS}
-	${CC} -c ${SRC}/print.c -o print.o
-
+# explicit rules lexx/yacc stuff:
 parser.o: y.tab.c
 	${CC} -c  y.tab.c -o parser.o 
-	
 lexer.o: lex.yy.c 
 	${CC} -c lex.yy.c -o lexer.o 
-	
 lex.yy.c: y.tab.c ${SRC}/simpio.l 
 	${LEX} --i ${SRC}/simpio.l
-
 y.tab.c: ${SRC}/simpio.y ${HEADERS}
 	${YACC} ${SRC}/simpio.y
-    
+
+# basic rule pattern for compiling C files
+%.o: ${SRC}/%.c
+	${CC} -c $< -o $@
+
+# magic gnu-recommended rule for creating dependency files 
+# modified to reference the source directory
+%.d: ${SRC}/%.c
+	@set -e; rm -f $@; \
+	$(CC) -MM $(CPPFLAGS) $< > $@.$$$$; \
+	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
+
+# alternate target to remove all generated files, including code coverage ones
 clean:  
-	rm -f lex.yy.c y.tab.c y.tab.h y.output ui.o editor.o hardware.o instruction.o execution.o hardware_changed.o lexer.o parser.o fifo.o print.o main.o simpio
-	rm -f ../tests/simpio
+	rm -f simpio
+	rm -f ${OBJS}
+	rm -f y.output y.tab.h y.tab.c lex.yy.c
+	rm -f *.d
 	rm -f *.gcno
 	rm -f *.gcda
 	rm -f *.gcov
