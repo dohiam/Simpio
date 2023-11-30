@@ -1,0 +1,139 @@
+;!
+;  @file /test_irq.simpio
+;  @brief Tests the PIO IRQ instruction
+;  @details
+;  Uses all SMs in pairs, one in a pair waiting on the other to set an IRQ.
+;  Tests using all 8 IRQs (0..7)
+;  Tests various syntax and tests relative and absolute IRQ indexing.
+;  Note that delays are used to ensure that clears happen after set&waits. Depending on timing, real HW might be different & require longer delays.
+;  
+;   fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+; 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SM 0 (set IRQ 4; set&wait on IRQ 0; clear IRQ 4)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config pio 0
+.config sm 0
+
+    IRQ 4
+    
+    IRQ WAIT 0 [2]
+
+    IRQ CLEAR 4 rel 
+
+DONE0:
+   JMP DONE0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SM 1 (set IRQ 5; set&wait on IRQ 1; clear IRQ 5)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config pio 0
+.config sm 1
+
+    IRQ SET 5
+    
+    IRQ WAIT 0 rel [2]
+    
+    IRQ CLEAR 5 
+    
+DONE1:
+   JMP DONE1
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SM 2 (set IRQ 6; set&wait on IRQ 2; clear IRQ 6)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config pio 0
+.config sm 2
+
+    IRQ NOWAIT 4 rel
+    
+    IRQ WAIT 2 [2]
+
+    IRQ CLEAR 4 rel
+
+DONE2:
+   JMP DONE2
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SM 3 (set IRQ 7; set&wait on IRQ 3; clear IRQ 7)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config pio 0
+.config sm 3
+
+    IRQ SET 7
+    
+    IRQ WAIT 0 rel [2]
+
+    IRQ CLEAR 7
+
+DONE3:
+   JMP DONE3
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SM 4 (set IRQ 0; clear IRQ 0; set&wait on IRQ 4)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config pio 1
+.config sm 0
+
+    IRQ set 0 [1]
+    
+    IRQ CLEAR 0 [1]
+    
+    IRQ WAIT 4 rel
+
+DONE4:
+   JMP DONE4
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SM 5 (set IRQ 1; clear IRQ 1; set&wait on IRQ 5)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config pio 1
+.config sm 1
+
+    IRQ SET 0 rel [1]
+    
+    IRQ CLEAR 0 rel [1]
+    
+    IRQ WAIT 4 rel
+
+DONE5:
+   JMP DONE5
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SM 6 (set IRQ 2; clear IRQ 2; wait on IRQ 6)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config pio 1
+.config sm 2
+
+    IRQ NOWAIT 0 rel [1]
+    
+    IRQ CLEAR 0 rel [1]
+    
+    IRQ WAIT 6
+
+DONE6:
+   JMP DONE6
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SM 7 (set IRQ 4; clear IRQ 3; wait on IRQ 7)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.config pio 1
+.config sm 3
+
+    IRQ 0 rel [1]
+    
+    IRQ CLEAR 3 [1]
+    
+    IRQ WAIT 4 rel 
+
+DONE7:
+   JMP DONE7

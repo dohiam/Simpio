@@ -156,6 +156,11 @@ static void printf_polarity(bool p) {
     else {printf("polarity: zero ");}
 }
                                      
+static void printf_relative(bool r) {
+    if (r) {printf("is relative ");}
+    else {printf("is not relative ");}
+}
+                                     
 static void printf_wait_source(wait_source_e w) {
     switch(w) {
         case gpio_source: printf("wait source: gpio "); break;
@@ -238,6 +243,7 @@ static void printf_instruction(instruction_t* instr) {
             printf("instruction: IRQ "); 
             printf_set_or_clear(instr->operation);
             printf_wait(instr->wait);
+            printf_relative(instr->is_relative);
             break;
         case set_instruction: 
             printf("instruction: SET "); 

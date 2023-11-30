@@ -7,6 +7,13 @@
  * for printing instructions.
  * Note: instruction memory is not modeled; instead of 32 uinit32's that are 
  * encoded/decoded, instructions are a structure that is already 'decoded'
+ *
+ * Also: it is probably helpful to think of an "instruction" defined by this file as an instance of an instruction type that exists in a PIO and is in some
+ *       state of execution by a state machine. So, for example "IRQ 0 rel (3)" is a type of instruction to set the first IRQ relative to a state machine and
+ *       then causes the state machine to pause for 3 cycles, but this instruction is loaded into a PIO, it becomes an instance with state information, so it
+ *       could represent actual IRQ 3 if its context is SM 3. Note that this approach of having state information as part of the "instruction" is very different
+ *       that actual hardware where an "instruction" is just some 32 bit value. 
+ *
  * 
  *  fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
  */

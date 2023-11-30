@@ -1,9 +1,30 @@
-#include "devices.h"
+/*!
+ * @file /device_spi_flash.c
+ * @brief SPI flash simulated device
+ * @details
+ * This implements a very small subset of the API of the Winbond family of SPI flash devices (e.g., W25Q128JVSIQ).
+ * As all simulated devices in Simpio, once enabled, this exposes a state machine execution function that is called
+ * periodically by the Simpio execution engine (see execution.c). Each time this function is called, it looks at the status
+ * of the simulated input GPIO lines that it is configured to use, and updates its internal state and possible fiddles the state of
+ * output GPIO lines that it is configured to use. 
+ *
+ * The only Winbond commands supported are those defined below in the #defines.
+ *
+ * Most of the state machine processing is shifting bits in and out. Once a command is completely shifted in, then that command
+ * is executed immediately, but a programmed delay can be simulated before the device declares itself ready for the next command.
+ *
+ * There is a rudimentary UI programmed using the temp_window from ui.c. This allows a user to step through instructions while leaving
+ * the temp window up. This makes it easier to see the progress of bits being shifted into and outof the simulated device. That is, one
+ * can watch the device execute, as its internal state is updated in response to what the PIO program is doing.
+ * 
+ *  fine-print: copyright 2023 David Hamilton. This is free software (see LICENSE.txt in root directory), provided "AS IS" without any warranty, express or implied.
+ */
+
+
+#include "device_spi_flash.h"
 #include "hardware.h"
 #include "print.h"
 #include "ui.h"
-
-//TODO: overview (could be more clever but hopefully not more straightforward)
 
 #define BYTE_RECEIVED (spif_state.shift_count == 8)
 #define BYTE_SENT     (spif_state.shift_count == 8)
@@ -192,7 +213,7 @@ void run_spi_flash() {
     spif_sm();
 }
 
-void devices_enable_spi_flash(uint8_t clk_pin, uint8_t tx_pin, uint8_t rx_pin, uint8_t cs_pin) {
+void device_enable_spi_flash(uint8_t clk_pin, uint8_t tx_pin, uint8_t rx_pin, uint8_t cs_pin) {
     PRINTI("enabling spi flash\n");
     spif_clk = clk_pin;
     spif_tx = tx_pin;
@@ -472,80 +493,3 @@ void spif_sm() {
     };
 }
         
-
-/*****************************************************************
- *
- *  KEYPAD DEVICE
- *
- *****************************************************************/
-
-static uint8_t row_pins[4];
-static uint8_t col_pins[4];
-static int8_t keypress_row, keypress_col;
-
-
-int display_keypad_state() {
-    int ch;
-    do {
-        werase(temp_window);
-        if (keypress_row < 0) { ui_temp_window_write("no key currently pressed\n"); }
-        else ui_temp_window_write("current keypress is row: %d col: %d\n", keypress_row+1, keypress_col+1);
-        ui_temp_window_write("\n\npress key on keyboard from following table to simulate a keypress\n");
-        ui_temp_window_write("or press space bar for no key pressed\n");
-        ui_temp_window_write("hit q to quit\n\n");
-        ui_temp_window_write("              COL 1    COL 2    COL 3    COL 4\n");
-        ui_temp_window_write("     ROW 1     1        2        3        A   \n");
-        ui_temp_window_write("     ROW 2     4        5        6        B   \n");
-        ui_temp_window_write("     ROW 3     7        8        9        C   \n");
-        ui_temp_window_write("     ROW 4     *        0        #        D   \n");
-        ch = getch();
-        switch (ch) {
-            case 'q':
-            case 'Q':  return 0;
-            case ' ':  keypress_row = keypress_col = -1; break;
-            case '1':  keypress_row = 0; keypress_col = 0; break;
-            case '2':  keypress_row = 0; keypress_col = 1; break;
-            case '3':  keypress_row = 0; keypress_col = 2; break;
-            case 'A':  keypress_row = 0; keypress_col = 3; break;
-            case '4':  keypress_row = 1; keypress_col = 0; break;
-            case '5':  keypress_row = 1; keypress_col = 1; break;
-            case '6':  keypress_row = 1; keypress_col = 2; break;
-            case 'B':  keypress_row = 1; keypress_col = 3; break;
-            case '7':  keypress_row = 2; keypress_col = 0; break;
-            case '8':  keypress_row = 2; keypress_col = 1; break;
-            case '9':  keypress_row = 2; keypress_col = 2; break;
-            case 'C':  keypress_row = 2; keypress_col = 3; break;
-            case '*':  keypress_row = 3; keypress_col = 0; break;
-            case '0':  keypress_row = 3; keypress_col = 1; break;
-            case '#':  keypress_row = 3; keypress_col = 2; break;
-            case 'D':  keypress_row = 3; keypress_col = 3; break;
-        };
-    } while (ch != 'q' && ch != 'Q');
-    return 0;
-}
-
-void run_keypad() {
-    int i;
-    bool v;
-    for (i=0; i<4; i++) hardware_set_gpio(col_pins[i],0);
-    for (i=0; i<4; i++) {
-        v = hardware_get_gpio(row_pins[i]);
-        if (v && keypress_row == i) {
-            hardware_set_gpio(col_pins[keypress_col], 1);
-            PRINTI("set key row pin %d col pin %d\n", row_pins[i], col_pins[keypress_col]);
-        }
-    }
-}
-
-void devices_enable_keypad(uint8_t r1_pin, uint8_t r2_pin, uint8_t r3_pin, uint8_t r4_pin, uint8_t c1_pin, uint8_t c2_pin, uint8_t c3_pin, uint8_t c4_pin) {
-    keypress_row = keypress_col = -1;
-    row_pins[0] = r1_pin;
-    row_pins[1] = r2_pin;
-    row_pins[2] = r3_pin;
-    row_pins[3] = r4_pin;
-    col_pins[0] = c1_pin;
-    col_pins[1] = c2_pin;
-    col_pins[2] = c3_pin;
-    col_pins[3] = c4_pin;
-    hardware_register_device("keypad", true, run_keypad, display_keypad_state);
-}

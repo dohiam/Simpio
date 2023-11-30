@@ -77,6 +77,8 @@ typedef struct {
     int      shiftctl_push_thresh;      /* the number of bits in the ISR that can be shifted in before the ISR is considered full */
     bool     shiftctl_out_shiftdir;     /* true shifts starting with LSB, false starts with MSB */
     bool     shiftctl_in_shiftdir;      /* true shifts starting with LSB, false starts with MSB */
+    int8_t   wrap;
+    int8_t   wrap_target;
     /* SM state data */
     uint32_t clock_tick;                /* each sm has their own clock; parallelelism is handled at a higher level by keeping keeping each SMs clock in sync */
     uint32_t pc_temp;                   /* for PC destination so that the instruction counter isn't updated until shifting is complete */
@@ -146,8 +148,8 @@ typedef struct {
  ************************************************************************************************************************/
 
 /* the following set and get a "current context" (pio and sm) for programs being added and executed */
-void hardware_set_pio(int pio, int line);
-void hardware_set_sm(int sm, int line);
+int hardware_set_pio(int pio, int line);
+int hardware_set_sm(int sm, int line);
 pio_t * hardware_pio_set();
 sm_t *  hardware_sm_set();
 uint8_t hardware_pio_num_set();
@@ -164,6 +166,9 @@ DEFINE_ENUMERATOR(sm_t, hardware_sm)
 DEFINE_ENUMERATOR(user_processor_t, hardware_user_processor)
 DEFINE_ENUMERATOR(ih_processor_t, hardware_ih_processor)
 DEFINE_ENUMERATOR(hardware_irq_flag_t, hardware_irq_flag)
+
+void hardware_set_wrap(int line);
+void hardware_set_wrap_target(int line);
 
 void hardware_set_pin_condition(int pin_num);
 void hardware_set_set_pins(int base, int num_pins, int line);

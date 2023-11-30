@@ -219,6 +219,7 @@ bool instruction_add(instruction_t* instr) {
     CURRENT_INSTRUCTION.bit_count = instr->bit_count;
     CURRENT_INSTRUCTION.write_value = instr->write_value;
     CURRENT_INSTRUCTION.location = instr->location;
+    CURRENT_INSTRUCTION.is_relative = instr->is_relative;
     snprintf(CURRENT_INSTRUCTION.label, SYMBOL_MAX, "%s", instr->label);
     CURRENT_INSTRUCTION.executing_sm_num = hardware_sm_num_set();
     CURRENT_INSTRUCTION.pio = hardware_pio_set();

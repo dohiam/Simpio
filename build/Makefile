@@ -18,7 +18,7 @@
 # INPUTS
 ############################################
 
-C_SOURCES = devices.c editor.c execution.c fifo.c hardware.c hardware_changed.c instruction.c main.c print.c symbols.c ui.c
+C_SOURCES = device_spi_flash.c device_keypad.c editor.c execution.c fifo.c hardware.c hardware_changed.c instruction.c main.c print.c symbols.c ui.c
 
 SRC = ../src
 INC = ../inc

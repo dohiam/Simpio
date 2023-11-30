@@ -40,7 +40,7 @@ output_loop:
     WRITE 0xFFFFFFFF
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; PIO Program 2: read byte on 8 pins
+; PIO Program 2: read byte on 1 pin
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .program receiver

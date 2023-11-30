@@ -19,7 +19,11 @@
 #include "ui.h"
 #include "parser.h"
 #include "print.h"
-#include "devices.h"
+#include "device_spi_flash.h"
+#include "device_keypad.h"
+
+#define END_PARSE_P {yylineno--; return -1;}
+#define END_PARSE {return -1;}
 
 extern FILE *yyin;
 extern int yylineno;
@@ -33,6 +37,21 @@ instruction_t ci;         /* information associated with the current instruction
 user_instruction_t uci;   /* information associated with the current user instruction */
 pio_t cpio;               /* information associated with the current pio */
 program_t cprog;          /* information associated with the current program */
+
+int wrap_target_used;
+int wrap_used;
+
+int test_once(int * v) {
+	if (*v) {
+		if (v == &wrap_target_used) PRINT("ERROR: wrap_target directive may be used only once\n");
+		if (v == &wrap_used) PRINT("ERROR: wrap directive may be used only once\n");
+		return 1;
+	}
+	else {
+		*v = 1;
+		return 0;
+	}
+}
 
 void yyerror(const char *str)
 {
@@ -49,6 +68,8 @@ void system_init() {
     instruction_set_defaults(&ci);
     hardware_set_system_defaults();  
     exec_reset();
+	wrap_target_used = 0;
+	wrap_used = 0;
 }
 
 int simpio_parse(char * pio_file_name)
@@ -124,7 +145,7 @@ int simpio_test_build(int argc, char** argv)
 
 %token _CONFIG _PIO _SM _PIN_CONDITION _SET_PINS _IN_PINS _OUT_PINS _SIDE_SET_PINS _SIDE_SET_COUNT _USER_PROCESSOR  _INTERRUPT_HANDLER _INTERRUPT_SOURCE
 %token _SHIFTCTL_OUT _SHIFTCTL_IN _FIFO_MERGE _CLKDIV _DATA_CONFIG _SERIAL _USB _RS232
-%token _DEVICE _SPI_FLASH _KEYPAD
+%token _DEVICE _SPI_FLASH _KEYPAD _KEYPRESS
 
 %token <ival> _BINARY_DIGIT _HEX_NUMBER _BINARY_NUMBER _DECIMAL_NUMBER _DELAY
 %token <sval> _SYMBOL 
@@ -145,8 +166,8 @@ int simpio_test_build(int argc, char** argv)
 statement_list: statement _EOL  { PRINTD("----------Done with line %d; going to next line----------\n", line_count+1); line_count++; } |  
                 statement_list statement _EOL { PRINTD("----------Done with line %d; going to next line----------\n", line_count+1); line_count++; } ;
 
-statement:  /* empty */ | label | directive | instruction_side {  ci.line = line_count+1; if(!instruction_add(&ci)) {yylineno--; return -1;} instruction_set_defaults(&ci); } | 
-                                              user_instruction_continue { uci.line = line_count+1; if (!instruction_user_add(&uci)) {yylineno--; return -1;} instruction_set_user_defaults(&uci); };
+statement:  /* empty */ | label | directive | instruction_side {  ci.line = line_count+1; if(!instruction_add(&ci)) END_PARSE_P instruction_set_defaults(&ci); } | 
+                                              user_instruction_continue { uci.line = line_count+1; if (!instruction_user_add(&uci)) END_PARSE_P instruction_set_user_defaults(&uci); };
 
 label: _SYMBOL _COLON { PRINTD("label: %s\n", $1); instruction_add_label($1); } ;
 
@@ -158,7 +179,8 @@ directive: define_directive | program_directive | origen_directive | wrap_target
 
 config_directive: _CONFIG config_statement
 
-config_statement: _PIO number { hardware_set_pio($2, line_count); } | _SM number { hardware_set_sm($2, line_count); } | 
+config_statement: _PIO number { if (hardware_set_pio($2, line_count) < 0) return line_count; } | 
+                   _SM number { if (hardware_set_sm($2, line_count) < 0)  return line_count; } | 
                   _PIN_CONDITION number { hardware_set_pin_condition($2); } |
                   _SET_PINS number number { hardware_set_set_pins($2,$3, line_count); } | 
                   _IN_PINS number { hardware_set_in_pins($2, line_count); } | 
@@ -184,16 +206,17 @@ program_directive: _PROGRAM _SYMBOL { hardware_set_program_name($2); }
 
 origen_directive: _ORIGEN expression /* TODO */
 
-wrap_target_directive: _WRAP_TARGET
+wrap_target_directive: _WRAP_TARGET { if (test_once(&wrap_target_used)) END_PARSE hardware_set_wrap_target(line_count); }
 
-wrap_directive: _WRAP
+wrap_directive: _WRAP { if (test_once(&wrap_used)) END_PARSE hardware_set_wrap(line_count); }
 
 lang_opt_directive: _LANG_OPT _SYMBOL  { /* todo */ }
 
 word_directive:  _WORD expression { /* todo */ }
 
-device_directive: _DEVICE _SPI_FLASH number number number number { devices_enable_spi_flash($3, $4, $5, $6); } |
-                  _DEVICE _KEYPAD number number number number number number number number { devices_enable_keypad($3, $4, $5, $6, $7, $8, $9, $10); }
+device_directive: _DEVICE _SPI_FLASH number number number number { device_enable_spi_flash($3, $4, $5, $6); } |
+                  _DEVICE _KEYPAD number number number number number number number number { device_enable_keypad($3, $4, $5, $6, $7, $8, $9, $10); } |
+				  _DEVICE _KEYPRESS number { device_set_keypress($3); }
 
 /****************************************************************************************************************
  * instructions: 

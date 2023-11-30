@@ -443,7 +443,7 @@ bool exec_instruction_decode(sm_t * sm) {
  **********************************************************************************************************/
 
 int exec_enable_ih(ih_processor_t * ih) {
-    PRINT("enabling ihs\n");
+    PRINTI("enabling ihs\n");
     exec_context = exec_interrupt;
     ih->enabled = true;
     ih->pc = 0;
@@ -632,7 +632,7 @@ int exec_step_programs_next_interrupt_instruction() {
             instr = &(ih->instructions[ih->pc]);
             instr->executing_up = (void *) ih;
             completed = exec_run_user_instruction(instr);
-            PRINT("pc %d (%d)\n", ih->pc, ih->next_instruction_location);
+            PRINTI("pc %d (%d)\n", ih->pc, ih->next_instruction_location);
             if (ih->pc >= ih->next_instruction_location) {
                 PRINTI("ih completed\n");
                 ih->enabled = false;
@@ -1345,34 +1345,44 @@ bool run_set_instruction(instruction_t * instruction) {
 
 bool run_irq_instruction(instruction_t * instruction) {
     sm_t * sm = (sm_t *) instruction->executing_sm;
+    uint8_t flag_num;
     bool completed = true;
     bool flag_state;
-    PRINT("running irq instruction line %d\n", instruction->line);
+    PRINTD("running irq instruction line %d\n", instruction->line);
+    if (instruction->is_relative) {
+        flag_num = instruction->index_or_value + sm->this_num;
+    }
+    else {
+        flag_num = instruction->index_or_value;
+    }
     switch (instruction->operation) {
         case nowait_operation:
-            PRINTI("setting irq without waiting %d\n", instruction->index_or_value);
-            hardware_irq_flag_set(instruction->index_or_value, true);
+            PRINTI("setting irq without waiting %d\n", flag_num);
+            hardware_irq_flag_set(flag_num, true);
             break;
         case wait_operation:
             if (instruction->already_set_waiting) {
-                PRINTI("waiting for clear %d\n", instruction->index_or_value);
-                flag_state = hardware_irq_flag_is_set(instruction->index_or_value);
+                flag_state = hardware_irq_flag_is_set(flag_num);
                 if (!flag_state) {
+                    PRINTI("Wait done for irq %d to be cleared\n", flag_num);
                     instruction->already_set_waiting = false;
                     completed = true;
                 }
-                else completed = false;
+                else {
+                    PRINTI("Waiting for irq %d to be cleared\n", flag_num);
+                    completed = false;
+                }
             }
             else {
-                PRINTI("setting irq and waiting for clear %d\n", instruction->index_or_value);
-                hardware_irq_flag_set(instruction->index_or_value, true);
+                PRINTI("Setting irq %d and waiting for it to be cleared\n", flag_num);
+                hardware_irq_flag_set(flag_num, true);
                 instruction->already_set_waiting = true;
                 completed = false;
             }
             break;
         case clear_operation:
             PRINTI("clearing irq %d\n", instruction->index_or_value);
-            hardware_irq_flag_set(instruction->index_or_value, false);
+            hardware_irq_flag_set(flag_num, false);
             break;
         default:
             PRINT("invalid irq operation, line %d\n", instruction->line);
@@ -1617,7 +1627,15 @@ bool exec_run_instruction(instruction_t * instruction) {
             if ( (instruction->instruction_type == out_instruction) && (instruction->destination == exec_destination) ) {
                 PRINTI("pc set by instruction written\n");
             }
-            else sm->pc++;
+            else {
+                if (sm->pc == sm->wrap) {
+					PRINT("wrapping to %d\n", sm->wrap_target);
+                    sm->pc = sm->wrap_target;
+                }
+                else {
+                    sm->pc++;
+                }
+            }
         }
     }
     else instruction->not_completed = true;

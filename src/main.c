@@ -195,8 +195,8 @@ int buildit(char *pio_pgm) {
     }
     else {
       built = true;
+      return -1;
     }
-    return -1;
 }
 
 static int prev_line;
@@ -231,7 +231,7 @@ int stepit() {
             if (instr.instruction_type == _no_instruction) { status_msg("error: no previous instruction: %d!\n", prev_line); }
             else {
               if (instr.instruction_type == _instruction) {
-                  if (instr.ioru.instruction_ptr->in_delay_state) { status_msg("Line %d delaying\n", prev_line); }
+                  if (instr.ioru.instruction_ptr->in_delay_state) { status_msg("Line %d in delay state\n", prev_line); }
                   else { if (instr.ioru.instruction_ptr->not_completed) { status_msg("Line %d blocked or not done yet\n", prev_line); }
                          //else status_msg("\n"); 
                        }
@@ -369,6 +369,17 @@ void show_fifos() {
     }
 }
 
+void show_irq_flags() {
+    char ch;
+    int i;
+    ui_temp_window_write("type q to exit\n\n");
+    i = 0;
+    FOR_ENUMERATION(irq_flag, hardware_irq_flag_t, hardware_irq_flag) {
+       ui_temp_window_write("irq flag: %d = %d \n", i, irq_flag->set);
+       i++;
+    }
+}
+
 int temp_window_handler() {
     int num_devices = 0;
     int ch, rc, rc2;
@@ -378,6 +389,7 @@ int temp_window_handler() {
     }
     else {
         ui_temp_window_write("f = show fifos\n");
+        ui_temp_window_write("i = show irq flags\n");
         FOR_ENUMERATION(device, hardware_device_t, hardware_device_enumerator) {
             if (device->enabled) {
                 ui_temp_window_write("%d = display state information for %s\n", num_devices, device->name);
@@ -391,6 +403,10 @@ int temp_window_handler() {
         if (ch == 'f' || ch == 'F') {
             werase(temp_window);
             show_fifos();
+        }
+        if (ch == 'i' || ch == 'I') {
+            werase(temp_window);
+            show_irq_flags();
         }
         if ('0' <= ch && ch <= '9') {
             ch = ch - '0';

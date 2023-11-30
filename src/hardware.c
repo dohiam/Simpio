@@ -58,16 +58,24 @@ void hardware_set_data(char * value) {
 }
 
 
-void hardware_set_pio(int pio, int line) {
-    if (pio < 0 || pio > 1) PRINT("Error (line %d): pio must be 0 or 1\n", line);
+int hardware_set_pio(int pio, int line) {
+    if (pio < 0 || pio > 1) {
+      PRINT("Error (line %d): pio must be 0 or 1\n", line+1);
+      return -1;
+    }
     current_pio = pio;
+    return 0;
 }
 
-void hardware_set_sm(int sm, int line) {
-    if (sm < 0 || sm > 3) PRINT("Error (line %d): sm must be 0..3\n", line);
+int hardware_set_sm(int sm, int line) {
+    if (sm < 0 || sm > 3) {
+      PRINT("Error (line %d): sm must be 0..3\n", line+1);
+      return -1;
+    }
     if (current_pio < 0) current_sm = sm;
     else current_sm = current_pio * 4 + sm;
     if (current_program_name) snprintf(CURRENT_SM.program_name, SYMBOL_MAX, "%s", current_program_name);
+    return 0;
 }
 
 void hardware_set_up(uint8_t pnum, int line) {
@@ -160,6 +168,8 @@ void hardware_set_pios_defaults() {
 
 void hardware_set_sm_defaults(uint8_t sm) {
     THIS_SM.pc = -1;
+    THIS_SM.wrap = -1;
+    THIS_SM.wrap_target = -1;
     THIS_SM.first_pc = -1;
     THIS_SM.pin_condition = -1; /* no pin condition set */
     THIS_SM.set_pins_base = 0;
@@ -313,6 +323,16 @@ void hardware_init_current_sm_pc_if_needed(int8_t first_instruction_location) {
 void hardware_init_current_up_pc_if_needed(int8_t first_instruction_location) {
     user_processor_t *  current_up = hardware_user_processor_set();
     if (current_up->pc < 0) current_up->pc = first_instruction_location;
+}
+
+void hardware_set_wrap(int line) {
+    PRINT("line: %d - setting wrap for pio %d to %d\n", line, current_pio, pios[current_pio].next_instruction_location - 1);
+    sms[current_sm].wrap = pios[current_pio].next_instruction_location - 1;
+}
+
+void hardware_set_wrap_target(int line) {
+    PRINT("line: %d - setting wrap_target for pio %d to %d\n", line, current_pio, pios[current_pio].next_instruction_location);
+    sms[current_sm].wrap_target = pios[current_pio].next_instruction_location;
 }
 
 void hardware_set_pin_condition(int pin_num) {

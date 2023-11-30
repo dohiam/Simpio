@@ -90,6 +90,7 @@ noblock                  { return _NOBLOCK; }
 \.device                 { PRINTD("device statement\n"); return _DEVICE; }
 spi_flash                { PRINTD("spi flash device\n"); return _SPI_FLASH; }
 keypad                   { PRINTD("keypad device\n"); return _KEYPAD; }
+keypress                 { PRINTD("keypress device\n"); return _KEYPRESS; }
 
 \.config                 { PRINTD("config statement\n"); return _CONFIG; }
 pio                      { return _PIO; }

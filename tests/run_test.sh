@@ -13,7 +13,7 @@ set -x
 for fn in "$@"
 do
     nl=$(wc -l < ${fn})
-    rc=$(./simpio t ${fn} ${nl})
+    rc=$(./simpio ts ${fn} ${nl})
     echo "Finished ${fn}"
 done
 
