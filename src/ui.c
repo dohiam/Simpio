@@ -303,7 +303,7 @@ ui_timeline_dialog_data_t * ui_show_timeline_dialog() {
           case KEY_BACKSPACE:
               i=timeline_dialog_data.gpio_values[timeline_dialog_field_num];
               getyx(timeline_dialog, y, x);
-              mvwprintw(timeline_dialog, 1,0,"                               ", i);
+              mvwprintw(timeline_dialog, 1,0,"                               ");
               i = i / 10;
               timeline_dialog_data.gpio_values[timeline_dialog_field_num] = i;
               wmove(timeline_dialog, y,x-1);

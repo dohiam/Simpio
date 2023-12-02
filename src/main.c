@@ -113,16 +113,16 @@ void update_regs() {
     FOR_ENUMERATION(pio, pio_t, hardware_pio) { 
         regs_msg("PIO: %1d ", pio_num);
         if (hardware_changed->pios[pio_num].irqs[0]) wattron(regs_win, A_BOLD);
-        regs_msg("IRQ-0: %1d ", pio->irqs[0]);
+        regs_msg("IRQ-0: %08X ", pio->irqs[0].flag);
         wattroff(regs_win, A_BOLD);      
         if (hardware_changed->pios[pio_num].irqs[1]) wattron(regs_win, A_BOLD);
-        regs_msg("IRQ-1: %1d\n", pio->irqs[1]);
+        regs_msg("IRQ-1: %08X\n", pio->irqs[1].flag);
         wattroff(regs_win, A_BOLD);      
         sm_num = 0;
         FOR_ENUMERATION(sm, sm_t, hardware_sm) {
             if (sm->pio_num != pio_num) {sm_num++; continue;}
             regs_msg("SM:%02d ", sm_num);
-            regs_msg("CLOCK: %04ld", sm->clock_tick);
+            regs_msg("CLOCK: %04d", sm->clock_tick);
             if (pio->instructions[sm->pc].delay_left > 0) wattron(regs_win, A_BOLD);
             regs_msg("  DELAY: %02d", pio->instructions[sm->pc].delay_left); 
             wattroff(regs_win, A_BOLD);      
